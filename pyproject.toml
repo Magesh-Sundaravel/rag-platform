@@ -1,0 +1,70 @@
+[project]
+name = "rag-platform"
+version = "0.1.0"
+description = "Production-grade RAG platform (workspace root)"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["services/*", "libs/*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+    "mypy>=1.14",
+    "ruff>=0.9",
+    "pre-commit>=4.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["libs/*/src", "services/*/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "C4", "RUF", "D"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["D"]
+"**/__init__.py" = ["D104"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+mypy_path = "libs/common/src:libs/contracts/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src"
+explicit_package_bases = true
+exclude = "(build|dist|\\.venv)"
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["libs", "services"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = [
+    "libs/common/src",
+    "libs/contracts/src",
+    "services/ingestion/src",
+    "services/processing/src",
+    "services/retrieval/src",
+    "services/generation/src",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true

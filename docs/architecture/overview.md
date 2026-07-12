@@ -80,6 +80,13 @@ env-configurable (`RAG_CHUNK_*`). Chunks persist to the `chunks` table with
 JSONB metadata (title, language, filename). Semantic and parent-child
 chunking are documented future work.
 
+## Metadata filtering
+
+Chunk metadata is flat-string JSONB (keys today: `title`, `language`,
+`filename`) with a `jsonb_path_ops` GIN index. `rag_contracts.filters`
+defines `MetadataFilter` (`eq` / `in`, AND semantics); retrieval translates
+filters to SQL predicates in `retrieval/filters.py`.
+
 ## Key decisions
 
 See `docs/adr/`: monorepo+uv (0001), microservice boundaries (0002),

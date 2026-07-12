@@ -1,8 +1,8 @@
 # Project Status
 
-- **Current Phase:** 4 — Metadata filters (starting)
-- **Completed:** Phases 0-3 (foundation; ingestion; worker pipeline; chunking strategies + chunks table)
-- **Next:** Phase 4 JSONB metadata filters in contracts + retrieval
+- **Current Phase:** 5 — Embeddings (starting)
+- **Completed:** Phases 0-4 (foundation; ingestion; processing worker; chunking; metadata filters + GIN index)
+- **Next:** Phase 5 EmbeddingProvider protocol, fake + Gemini providers, pgvector column + HNSW
 - **Blocked:** real Gemini calls locally (key only in CI secret; provider fakes per ADR-0003)
-- **Tests:** 77 passed + 3 integration (CI-only), coverage 95%
-- **Last Commit:** feat(processing): chunking strategies and chunks table (phase 3)
+- **Tests:** 87 passed + 3 integration (CI-only), coverage 96%
+- **Last Commit:** feat(retrieval): metadata filter contracts and JSONB predicates (phase 4)

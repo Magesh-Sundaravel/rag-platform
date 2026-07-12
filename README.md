@@ -54,7 +54,7 @@ curl localhost:8001/health
 | 1 | Document ingestion: upload, parsing, dedup, versioning | ✅ |
 | 2 | Processing pipeline: jobs, workers, normalization | ✅ |
 | 3 | Chunking strategies | ✅ |
-| 4 | Metadata architecture | ⏳ |
+| 4 | Metadata architecture | ✅ |
 | 5 | Gemini embeddings + pgvector | ⏳ |
 | 6 | Retrieval: vector + BM25 + hybrid + rerank | ⏳ |
 | 7 | Generation: Gemini, citations, memory | ⏳ |

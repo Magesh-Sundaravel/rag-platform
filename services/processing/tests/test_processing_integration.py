@@ -10,8 +10,11 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from processing.chunking import RecursiveCharacterChunker
 from processing.worker import claim_job, run_once
-from rag_db.models import Document, Job
+from rag_db.models import Chunk, Document, Job
+
+CHUNKER = RecursiveCharacterChunker(200, 20)
 
 DB_URL = os.environ.get("RAG_TEST_DB_URL", "")
 pytestmark = pytest.mark.skipif(not DB_URL, reason="RAG_TEST_DB_URL not set")
@@ -82,10 +85,10 @@ async def test_skip_locked_prevents_double_claim(
 async def test_run_once_processes_on_postgres(
     pg_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    while await run_once(pg_factory):
+    while await run_once(pg_factory, CHUNKER):
         pass
     job_id = await seed_job(pg_factory)
-    assert await run_once(pg_factory) is True
+    assert await run_once(pg_factory, CHUNKER) is True
     async with pg_factory() as session:
         job = await session.get(Job, job_id)
         assert job is not None
@@ -93,3 +96,6 @@ async def test_run_once_processes_on_postgres(
         doc = await session.get(Document, job.document_id)
         assert doc is not None
         assert doc.status == "processed"
+        chunks = (await session.scalars(select(Chunk).where(Chunk.document_id == doc.id))).all()
+        assert chunks
+        assert chunks[0].meta["filename"] == doc.filename

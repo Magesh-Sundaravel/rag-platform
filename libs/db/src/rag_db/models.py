@@ -6,10 +6,14 @@ Types are chosen to stay portable: unit tests run these models on SQLite
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
+
+PortableJSON = JSONB().with_variant(JSON(), "sqlite")
 
 
 class Base(DeclarativeBase):
@@ -53,3 +57,19 @@ class Job(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+
+class Chunk(Base):
+    """A retrieval-sized chunk of a document with per-chunk metadata."""
+
+    __tablename__ = "chunks"
+    __table_args__ = (UniqueConstraint("document_id", "chunk_index"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    meta: Mapped[dict[str, Any]] = mapped_column("metadata", PortableJSON, nullable=False)

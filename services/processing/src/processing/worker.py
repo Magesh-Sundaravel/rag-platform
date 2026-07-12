@@ -5,6 +5,7 @@ import asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from processing.chunking import Chunker
 from processing.pipeline import process_document
 from rag_common.logging import get_logger
 from rag_db.models import Document, Job
@@ -62,12 +63,13 @@ async def _mark_failure(session: AsyncSession, job: Job, error: str) -> None:
     await session.commit()
 
 
-async def run_job(session: AsyncSession, job: Job) -> None:
+async def run_job(session: AsyncSession, job: Job, chunker: Chunker) -> None:
     """Execute one claimed job and persist the outcome.
 
     Args:
         session: Active async session.
         job: A job in ``in_progress`` state.
+        chunker: Chunking strategy passed to the pipeline.
     """
     try:
         if job.job_type != PROCESS_JOB_TYPE:
@@ -75,7 +77,7 @@ async def run_job(session: AsyncSession, job: Job) -> None:
         document = await session.get(Document, job.document_id)
         if document is None:
             raise ValueError(f"document {job.document_id} not found")
-        await process_document(session, document)
+        await process_document(session, document, chunker)
         job.status = "done"
         await session.commit()
         logger.info("job done", job_id=str(job.id), document_id=str(job.document_id))
@@ -86,11 +88,12 @@ async def run_job(session: AsyncSession, job: Job) -> None:
             await _mark_failure(session, job_row, str(exc))
 
 
-async def run_once(factory: async_sessionmaker[AsyncSession]) -> bool:
+async def run_once(factory: async_sessionmaker[AsyncSession], chunker: Chunker) -> bool:
     """Claim and run at most one job.
 
     Args:
         factory: Session factory.
+        chunker: Chunking strategy passed to the pipeline.
 
     Returns:
         True if a job was processed, False if the queue was empty.
@@ -99,12 +102,13 @@ async def run_once(factory: async_sessionmaker[AsyncSession]) -> bool:
         job = await claim_job(session)
         if job is None:
             return False
-        await run_job(session, job)
+        await run_job(session, job, chunker)
         return True
 
 
 async def worker_loop(
     factory: async_sessionmaker[AsyncSession],
+    chunker: Chunker,
     *,
     poll_interval: float,
     stop_event: asyncio.Event | None = None,
@@ -113,11 +117,12 @@ async def worker_loop(
 
     Args:
         factory: Session factory.
+        chunker: Chunking strategy passed to the pipeline.
         poll_interval: Seconds to sleep when the queue is empty.
         stop_event: Optional cooperative stop signal (used by tests and
             graceful shutdown).
     """
     while stop_event is None or not stop_event.is_set():
-        processed = await run_once(factory)
+        processed = await run_once(factory, chunker)
         if not processed:
             await asyncio.sleep(poll_interval)

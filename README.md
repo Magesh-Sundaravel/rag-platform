@@ -53,7 +53,7 @@ curl localhost:8001/health
 | 0 | Foundation: monorepo, CI, quality gates, service skeletons | ✅ |
 | 1 | Document ingestion: upload, parsing, dedup, versioning | ✅ |
 | 2 | Processing pipeline: jobs, workers, normalization | ✅ |
-| 3 | Chunking strategies | ⏳ |
+| 3 | Chunking strategies | ✅ |
 | 4 | Metadata architecture | ⏳ |
 | 5 | Gemini embeddings + pgvector | ⏳ |
 | 6 | Retrieval: vector + BM25 + hybrid + rerank | ⏳ |

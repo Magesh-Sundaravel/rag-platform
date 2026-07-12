@@ -71,6 +71,15 @@ retries up to `max_attempts`, then dead-letters (`dead`) and marks the
 document `failed`. Pipeline: normalize (NFKC/whitespace) → metadata (title,
 language heuristic, char/token counts) → chunk (Phase 3) → embed (Phase 5).
 
+## Chunking
+
+Own implementation (no LangChain): `FixedSizeChunker` (character windows +
+overlap) and `RecursiveCharacterChunker` (paragraph → line → sentence →
+word hierarchy, greedy merge, overlap carry). Strategy/size/overlap are
+env-configurable (`RAG_CHUNK_*`). Chunks persist to the `chunks` table with
+JSONB metadata (title, language, filename). Semantic and parent-child
+chunking are documented future work.
+
 ## Key decisions
 
 See `docs/adr/`: monorepo+uv (0001), microservice boundaries (0002),

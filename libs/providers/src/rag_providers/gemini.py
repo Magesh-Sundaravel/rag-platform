@@ -10,8 +10,10 @@ from google import genai
 from google.genai import types
 
 from rag_providers.embedding import DEFAULT_DIMENSION
+from rag_providers.generation import GenerationResult
 
 EMBEDDING_MODEL = "gemini-embedding-001"
+GENERATION_MODEL = "gemini-2.5-flash"
 
 
 class GeminiEmbeddingProvider:
@@ -55,3 +57,39 @@ class GeminiEmbeddingProvider:
         if not response.embeddings:
             raise RuntimeError("Gemini returned no embeddings")
         return [list(e.values or []) for e in response.embeddings]
+
+
+class GeminiGenerationProvider:
+    """Answer generation from ``gemini-2.5-flash``."""
+
+    def __init__(
+        self,
+        model: str = GENERATION_MODEL,
+        client: genai.Client | None = None,
+    ) -> None:
+        """Configure the provider.
+
+        Args:
+            model: Gemini generation model name.
+            client: Optional pre-built client (tests inject a mock);
+                defaults to ``genai.Client()`` which reads ``GEMINI_API_KEY``.
+        """
+        self.model = model
+        self._client = client or genai.Client()
+
+    async def generate(self, prompt: str) -> GenerationResult:
+        """Generate an answer via the Gemini API.
+
+        Args:
+            prompt: The full grounded prompt (question + numbered context).
+
+        Returns:
+            The generated text and token usage.
+        """
+        response = await self._client.aio.models.generate_content(model=self.model, contents=prompt)
+        usage = response.usage_metadata
+        return GenerationResult(
+            text=response.text or "",
+            prompt_tokens=(usage.prompt_token_count or 0) if usage else 0,
+            completion_tokens=(usage.candidates_token_count or 0) if usage else 0,
+        )

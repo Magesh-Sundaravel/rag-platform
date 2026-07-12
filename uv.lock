@@ -1292,15 +1292,19 @@ name = "rag-generation"
 version = "0.1.0"
 source = { editable = "services/generation" }
 dependencies = [
+    { name = "httpx" },
     { name = "rag-common" },
     { name = "rag-contracts" },
+    { name = "rag-providers" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.28" },
     { name = "rag-common", editable = "libs/common" },
     { name = "rag-contracts", editable = "libs/contracts" },
+    { name = "rag-providers", editable = "libs/providers" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
 ]
 

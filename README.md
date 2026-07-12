@@ -57,7 +57,7 @@ curl localhost:8001/health
 | 4 | Metadata architecture | ✅ |
 | 5 | Gemini embeddings + pgvector | ✅ |
 | 6 | Retrieval: vector + BM25 + hybrid + rerank | ✅ |
-| 7 | Generation: Gemini, citations, memory | ⏳ |
+| 7 | Generation: Gemini, citations, memory | ✅ |
 | 8 | RAGAS evaluation framework | ⏳ |
 | 9 | Guardrails + OpenTelemetry | ⏳ |
 | 10 | GCP deployment: Terraform, GKE, Cloud SQL | ⏳ |

@@ -11,10 +11,12 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from rag_common.config import BaseServiceSettings
 from rag_common.exceptions import RagPlatformError
 from rag_common.logging import configure_logging, get_logger
+from rag_common.tracing import configure_tracing
 
 Lifespan = Callable[[FastAPI], contextlib.AbstractAsyncContextManager[None]]
 
@@ -38,8 +40,10 @@ def create_app(
         A configured FastAPI application.
     """
     configure_logging(settings)
+    configure_tracing(settings)
     logger = get_logger(settings.service_name)
     app = FastAPI(title=title, version=version, lifespan=lifespan)
+    FastAPIInstrumentor.instrument_app(app)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

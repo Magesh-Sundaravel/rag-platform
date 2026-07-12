@@ -7,6 +7,7 @@ dependencies = [
     "rag-common",
     "rag-contracts",
     "rag-providers",
+    "rag-guardrails",
     "uvicorn[standard]>=0.34",
     "httpx>=0.28",
 ]
@@ -15,6 +16,7 @@ dependencies = [
 rag-common = { workspace = true }
 rag-contracts = { workspace = true }
 rag-providers = { workspace = true }
+rag-guardrails = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -1,8 +1,8 @@
 # Project Status
 
-- **Current Phase:** 9 — Guardrails + OpenTelemetry (starting)
-- **Completed:** Phases 0-8 (foundation; ingestion; worker; chunking; metadata filters; embeddings + pgvector HNSW; hybrid retrieval; generation with citations; RAGAS evaluation)
-- **Next:** Phase 9 guardrails + OpenTelemetry
+- **Current Phase:** 10 — GCP deployment (starting)
+- **Completed:** Phases 0-9 (foundation; ingestion; worker; chunking; metadata filters; embeddings + pgvector HNSW; hybrid retrieval; generation with citations; RAGAS evaluation; guardrails + OpenTelemetry)
+- **Next:** Phase 10 GCP deployment (Terraform, GKE, Cloud SQL)
 - **Blocked:** none (real Gemini exercised via llm-smoke workflow)
-- **Tests:** 148 passed + 11 gated (CI/LLM-only + Postgres-only), coverage 94%
-- **Last Commit:** feat(evaluation): minimal RAGAS-style answer-quality metrics (phase 8)
+- **Tests:** 169 passed + 11 gated (CI/LLM-only + Postgres-only), coverage 94%
+- **Last Commit:** feat(guardrails): heuristic guardrails + OpenTelemetry tracing (phase 9)

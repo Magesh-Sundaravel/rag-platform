@@ -1,0 +1,13 @@
+[project]
+name = "rag-guardrails"
+version = "0.1.0"
+description = "Heuristic input/output guardrails: prompt-injection detection, PII redaction (ADR-0008)"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rag_guardrails"]

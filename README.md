@@ -24,10 +24,11 @@ flowchart LR
 | `retrieval` | 8003 | Vector, full-text, and hybrid search |
 | `generation` | 8004 | RAG query API: retrieval + Gemini generation with citations |
 
-Shared code lives in `libs/common` (settings, logging, errors, app factory),
-`libs/contracts` (cross-service Pydantic models), and `libs/evaluation`
-(RAGAS-style answer-quality metrics, ADR-0007). Services never import each
-other — only `libs/*` (see ADR-0002).
+Shared code lives in `libs/common` (settings, logging, errors, app factory,
+tracing), `libs/contracts` (cross-service Pydantic models), `libs/evaluation`
+(RAGAS-style answer-quality metrics, ADR-0007), and `libs/guardrails`
+(prompt-injection detection, PII redaction, ADR-0008). Services never import
+each other — only `libs/*` (see ADR-0002).
 
 ## Quickstart
 
@@ -60,7 +61,7 @@ curl localhost:8001/health
 | 6 | Retrieval: vector + BM25 + hybrid + rerank | ✅ |
 | 7 | Generation: Gemini, citations, memory | ✅ |
 | 8 | RAGAS evaluation framework | ✅ |
-| 9 | Guardrails + OpenTelemetry | ⏳ |
+| 9 | Guardrails + OpenTelemetry | ✅ |
 | 10 | GCP deployment: Terraform, GKE, Cloud SQL | ⏳ |
 
 See [PROJECT_STATUS.md](PROJECT_STATUS.md) for live progress.

@@ -19,6 +19,8 @@ class BaseServiceSettings(BaseSettings):
         log_level: Root log level (standard logging level names).
         host: Bind address for the HTTP server.
         port: Bind port for the HTTP server.
+        otel_exporter_endpoint: OTLP/HTTP collector endpoint. Unset (the
+            default) leaves tracing as a zero-cost no-op (ADR-0008).
     """
 
     model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore")
@@ -28,6 +30,7 @@ class BaseServiceSettings(BaseSettings):
     log_level: str = "INFO"
     host: str = "0.0.0.0"
     port: int = 8000
+    otel_exporter_endpoint: str | None = None
 
     @property
     def is_dev(self) -> bool:

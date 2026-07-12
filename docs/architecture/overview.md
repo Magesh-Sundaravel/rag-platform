@@ -95,6 +95,25 @@ Provider protocols + deterministic fakes live in `libs/providers`
 `chunks.embedding vector(768)` with an HNSW cosine index. Real-LLM smoke
 tests run in the `llm-smoke` workflow only.
 
+## Evaluation
+
+`rag_evaluation` scores generation output on the four core RAGAS metrics
+(faithfulness, answer relevancy, context precision/recall) via
+judge-prompted scoring over the existing `GenerationProvider` abstraction —
+no separate LLM-integration path (ADR-0007). A 3-example golden dataset
+runs through the real Gemini judge in the `llm-smoke` workflow.
+
+## Guardrails and observability
+
+`rag_guardrails` applies heuristic (regex-based, no LLM call) checks at
+the generation service's `/query` boundary: prompt-injection phrase
+detection rejects flagged questions before retrieval runs, and PII
+redaction scrubs the answer before it's returned (ADR-0008). Tracing
+(`rag_common.tracing`) instruments every service's FastAPI app; actually
+exporting spans and propagating trace context over the generation ->
+retrieval HTTP call is gated on `RAG_OTEL_EXPORTER_ENDPOINT` — unset (the
+local/CI default) leaves tracing as a genuine no-op.
+
 ## Key decisions
 
 See `docs/adr/`: monorepo+uv (0001), microservice boundaries (0002),

@@ -7,8 +7,11 @@ from fastapi import APIRouter, Depends
 from generation.config import Settings
 from generation.prompting import build_prompt, extract_citations
 from generation.retrieval_client import RetrievalClient
+from rag_common.exceptions import InvalidInputError
 from rag_contracts.generation import QueryRequest, QueryResponse, Usage
 from rag_contracts.search import SearchRequest
+from rag_guardrails.pii import redact_pii
+from rag_guardrails.prompt_injection import detect_prompt_injection
 from rag_providers.factory import build_generation_provider
 from rag_providers.generation import GenerationProvider
 
@@ -41,6 +44,9 @@ async def query(
     request: QueryRequest, retrieval_client: RetrievalClientDep, generator: GenerationProviderDep
 ) -> QueryResponse:
     """Answer a question grounded in retrieved chunks, with citations."""
+    if detect_prompt_injection(request.question):
+        raise InvalidInputError("question was flagged as a potential prompt injection")
+
     search_response = await retrieval_client.search(
         SearchRequest(query=request.question, top_k=request.top_k, filters=request.filters)
     )
@@ -55,7 +61,7 @@ async def query(
     result = await generator.generate(prompt)
     citations = extract_citations(result.text, search_response.items)
     return QueryResponse(
-        answer=result.text,
+        answer=redact_pii(result.text),
         citations=citations,
         usage=Usage(prompt_tokens=result.prompt_tokens, completion_tokens=result.completion_tokens),
     )

@@ -9,6 +9,7 @@ from processing.chunking import Chunker
 from processing.pipeline import process_document
 from rag_common.logging import get_logger
 from rag_db.models import Document, Job
+from rag_providers.embedding import EmbeddingProvider
 
 logger = get_logger("processing.worker")
 
@@ -63,13 +64,16 @@ async def _mark_failure(session: AsyncSession, job: Job, error: str) -> None:
     await session.commit()
 
 
-async def run_job(session: AsyncSession, job: Job, chunker: Chunker) -> None:
+async def run_job(
+    session: AsyncSession, job: Job, chunker: Chunker, embedder: EmbeddingProvider
+) -> None:
     """Execute one claimed job and persist the outcome.
 
     Args:
         session: Active async session.
         job: A job in ``in_progress`` state.
         chunker: Chunking strategy passed to the pipeline.
+        embedder: Embedding provider passed to the pipeline.
     """
     try:
         if job.job_type != PROCESS_JOB_TYPE:
@@ -77,7 +81,7 @@ async def run_job(session: AsyncSession, job: Job, chunker: Chunker) -> None:
         document = await session.get(Document, job.document_id)
         if document is None:
             raise ValueError(f"document {job.document_id} not found")
-        await process_document(session, document, chunker)
+        await process_document(session, document, chunker, embedder)
         job.status = "done"
         await session.commit()
         logger.info("job done", job_id=str(job.id), document_id=str(job.document_id))
@@ -88,12 +92,15 @@ async def run_job(session: AsyncSession, job: Job, chunker: Chunker) -> None:
             await _mark_failure(session, job_row, str(exc))
 
 
-async def run_once(factory: async_sessionmaker[AsyncSession], chunker: Chunker) -> bool:
+async def run_once(
+    factory: async_sessionmaker[AsyncSession], chunker: Chunker, embedder: EmbeddingProvider
+) -> bool:
     """Claim and run at most one job.
 
     Args:
         factory: Session factory.
         chunker: Chunking strategy passed to the pipeline.
+        embedder: Embedding provider passed to the pipeline.
 
     Returns:
         True if a job was processed, False if the queue was empty.
@@ -102,13 +109,14 @@ async def run_once(factory: async_sessionmaker[AsyncSession], chunker: Chunker) 
         job = await claim_job(session)
         if job is None:
             return False
-        await run_job(session, job, chunker)
+        await run_job(session, job, chunker, embedder)
         return True
 
 
 async def worker_loop(
     factory: async_sessionmaker[AsyncSession],
     chunker: Chunker,
+    embedder: EmbeddingProvider,
     *,
     poll_interval: float,
     stop_event: asyncio.Event | None = None,
@@ -118,11 +126,12 @@ async def worker_loop(
     Args:
         factory: Session factory.
         chunker: Chunking strategy passed to the pipeline.
+        embedder: Embedding provider passed to the pipeline.
         poll_interval: Seconds to sleep when the queue is empty.
         stop_event: Optional cooperative stop signal (used by tests and
             graceful shutdown).
     """
     while stop_event is None or not stop_event.is_set():
-        processed = await run_once(factory, chunker)
+        processed = await run_once(factory, chunker, embedder)
         if not processed:
             await asyncio.sleep(poll_interval)

@@ -11,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from processing.chunking import RecursiveCharacterChunker
 from processing.worker import claim_job, run_once, worker_loop
 from rag_db.models import Base, Chunk, Document, Job
+from rag_providers.embedding import FakeEmbeddingProvider
 
 CHUNKER = RecursiveCharacterChunker(200, 20)
+EMBEDDER = FakeEmbeddingProvider(8)
 
 
 @pytest.fixture
@@ -61,7 +63,7 @@ async def test_successful_job_marks_document_processed(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
     doc, job = await seed(factory)
-    assert await run_once(factory, CHUNKER) is True
+    assert await run_once(factory, CHUNKER, EMBEDDER) is True
     async with factory() as session:
         assert (await session.get(Job, job.id)).status == "done"  # type: ignore[union-attr]
         assert (await session.get(Document, doc.id)).status == "processed"  # type: ignore[union-attr]
@@ -69,17 +71,19 @@ async def test_successful_job_marks_document_processed(
         assert chunks
         assert chunks[0].meta["title"] == "Title"
         assert chunks[0].token_count > 0
+        assert chunks[0].embedding is not None
+        assert len(chunks[0].embedding) == 8
 
 
 async def test_reprocessing_replaces_chunks(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
     doc, _job = await seed(factory)
-    assert await run_once(factory, CHUNKER) is True
+    assert await run_once(factory, CHUNKER, EMBEDDER) is True
     async with factory() as session:
         session.add(Job(document_id=doc.id, job_type="process_document", status="pending"))
         await session.commit()
-    assert await run_once(factory, CHUNKER) is True
+    assert await run_once(factory, CHUNKER, EMBEDDER) is True
     async with factory() as session:
         chunks = (await session.scalars(select(Chunk).where(Chunk.document_id == doc.id))).all()
         indexes = sorted(c.chunk_index for c in chunks)
@@ -90,14 +94,14 @@ async def test_unknown_job_type_retries_then_dies(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
     doc, job = await seed(factory, job_type="bogus", max_attempts=2)
-    assert await run_once(factory, CHUNKER) is True
+    assert await run_once(factory, CHUNKER, EMBEDDER) is True
     async with factory() as session:
         refreshed = await session.get(Job, job.id)
         assert refreshed is not None
         assert refreshed.status == "pending"
         assert refreshed.attempts == 1
         assert "unknown job type" in (refreshed.last_error or "")
-    assert await run_once(factory, CHUNKER) is True
+    assert await run_once(factory, CHUNKER, EMBEDDER) is True
     async with factory() as session:
         refreshed = await session.get(Job, job.id)
         assert refreshed is not None
@@ -110,7 +114,7 @@ async def test_unknown_job_type_retries_then_dies(
 async def test_run_once_returns_false_when_idle(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    assert await run_once(factory, CHUNKER) is False
+    assert await run_once(factory, CHUNKER, EMBEDDER) is False
 
 
 async def test_worker_loop_processes_and_stops(
@@ -118,7 +122,9 @@ async def test_worker_loop_processes_and_stops(
 ) -> None:
     _doc, job = await seed(factory)
     stop = asyncio.Event()
-    task = asyncio.create_task(worker_loop(factory, CHUNKER, poll_interval=0.01, stop_event=stop))
+    task = asyncio.create_task(
+        worker_loop(factory, CHUNKER, EMBEDDER, poll_interval=0.01, stop_event=stop)
+    )
     for _ in range(100):
         await asyncio.sleep(0.01)
         async with factory() as session:

@@ -1,0 +1,15 @@
+[project]
+name = "rag-providers"
+version = "0.1.0"
+description = "LLM provider protocols, deterministic fakes, and Gemini implementations (ADR-0006)"
+requires-python = ">=3.12"
+dependencies = [
+    "google-genai>=1.20",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rag_providers"]

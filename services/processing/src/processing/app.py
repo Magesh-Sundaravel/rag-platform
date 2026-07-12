@@ -12,6 +12,7 @@ from processing.config import Settings
 from processing.worker import worker_loop
 from rag_common.app_factory import create_app
 from rag_db.session import create_engine, create_session_factory
+from rag_providers.factory import build_embedding_provider
 
 settings = Settings()
 
@@ -25,9 +26,16 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     engine = create_engine(settings.database_url)
     factory = create_session_factory(engine)
     chunker = build_chunker(settings.chunk_strategy, settings.chunk_size, settings.chunk_overlap)
+    embedder = build_embedding_provider(settings.embedding_provider)
     stop = asyncio.Event()
     task = asyncio.create_task(
-        worker_loop(factory, chunker, poll_interval=settings.poll_interval_seconds, stop_event=stop)
+        worker_loop(
+            factory,
+            chunker,
+            embedder,
+            poll_interval=settings.poll_interval_seconds,
+            stop_event=stop,
+        )
     )
     try:
         yield

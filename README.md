@@ -55,7 +55,7 @@ curl localhost:8001/health
 | 2 | Processing pipeline: jobs, workers, normalization | ✅ |
 | 3 | Chunking strategies | ✅ |
 | 4 | Metadata architecture | ✅ |
-| 5 | Gemini embeddings + pgvector | ⏳ |
+| 5 | Gemini embeddings + pgvector | ✅ |
 | 6 | Retrieval: vector + BM25 + hybrid + rerank | ⏳ |
 | 7 | Generation: Gemini, citations, memory | ⏳ |
 | 8 | RAGAS evaluation framework | ⏳ |

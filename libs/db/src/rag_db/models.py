@@ -8,12 +8,15 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
 PortableJSON = JSONB().with_variant(JSON(), "sqlite")
+
+EMBEDDING_DIMENSION = 768
 
 
 class Base(DeclarativeBase):
@@ -73,3 +76,4 @@ class Chunk(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
     meta: Mapped[dict[str, Any]] = mapped_column("metadata", PortableJSON, nullable=False)
+    embedding: Mapped[Any | None] = mapped_column(Vector(EMBEDDING_DIMENSION), nullable=True)

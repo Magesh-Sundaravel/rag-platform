@@ -87,6 +87,14 @@ Chunk metadata is flat-string JSONB (keys today: `title`, `language`,
 defines `MetadataFilter` (`eq` / `in`, AND semantics); retrieval translates
 filters to SQL predicates in `retrieval/filters.py`.
 
+## Embeddings
+
+Provider protocols + deterministic fakes live in `libs/providers`
+(ADR-0006). Production uses Gemini `gemini-embedding-001` (768 dims,
+`google-genai` SDK, `GEMINI_API_KEY`). Chunk vectors persist to
+`chunks.embedding vector(768)` with an HNSW cosine index. Real-LLM smoke
+tests run in the `llm-smoke` workflow only.
+
 ## Key decisions
 
 See `docs/adr/`: monorepo+uv (0001), microservice boundaries (0002),

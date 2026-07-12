@@ -63,6 +63,14 @@ One shared Postgres instance in the MVP (ADR-0004). ORM models live in
 migration lineage. Tables so far: `documents` (dedup by sha256 content
 hash, per-filename versioning), `jobs` (outbox for async processing).
 
+## Async processing
+
+The `jobs` table is the queue (ADR-0005): ingestion enqueues transactionally
+(outbox), the processing service claims with `FOR UPDATE SKIP LOCKED`,
+retries up to `max_attempts`, then dead-letters (`dead`) and marks the
+document `failed`. Pipeline: normalize (NFKC/whitespace) → metadata (title,
+language heuristic, char/token counts) → chunk (Phase 3) → embed (Phase 5).
+
 ## Key decisions
 
 See `docs/adr/`: monorepo+uv (0001), microservice boundaries (0002),

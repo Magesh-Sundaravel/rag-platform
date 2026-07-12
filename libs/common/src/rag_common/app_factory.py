@@ -5,6 +5,7 @@ duplicate: health/readiness endpoints, structured request logging, and a
 consistent JSON error envelope for domain exceptions.
 """
 
+import contextlib
 import time
 from collections.abc import Awaitable, Callable
 
@@ -15,21 +16,30 @@ from rag_common.config import BaseServiceSettings
 from rag_common.exceptions import RagPlatformError
 from rag_common.logging import configure_logging, get_logger
 
+Lifespan = Callable[[FastAPI], contextlib.AbstractAsyncContextManager[None]]
 
-def create_app(settings: BaseServiceSettings, *, title: str, version: str = "0.1.0") -> FastAPI:
+
+def create_app(
+    settings: BaseServiceSettings,
+    *,
+    title: str,
+    version: str = "0.1.0",
+    lifespan: Lifespan | None = None,
+) -> FastAPI:
     """Build a FastAPI app with the platform's standard wiring.
 
     Args:
         settings: Service settings (name, environment, log level, bind info).
         title: Human-readable API title shown in OpenAPI docs.
         version: API version string.
+        lifespan: Optional lifespan context manager (background tasks etc.).
 
     Returns:
         A configured FastAPI application.
     """
     configure_logging(settings)
     logger = get_logger(settings.service_name)
-    app = FastAPI(title=title, version=version)
+    app = FastAPI(title=title, version=version, lifespan=lifespan)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

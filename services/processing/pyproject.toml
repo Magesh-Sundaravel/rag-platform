@@ -7,11 +7,13 @@ dependencies = [
     "rag-common",
     "rag-contracts",
     "uvicorn[standard]>=0.34",
+    "rag-db",
 ]
 
 [tool.uv.sources]
 rag-common = { workspace = true }
 rag-contracts = { workspace = true }
+rag-db = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

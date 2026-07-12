@@ -8,3 +8,6 @@ class Settings(BaseServiceSettings):
 
     service_name: str = "processing"
     port: int = 8002
+    database_url: str = "postgresql+asyncpg://rag:rag_dev_password@localhost:5432/rag"
+    poll_interval_seconds: float = 1.0
+    worker_enabled: bool = True

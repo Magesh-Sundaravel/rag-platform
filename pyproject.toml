@@ -43,7 +43,7 @@ convention = "google"
 strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
-mypy_path = "libs/common/src:libs/contracts/src:libs/db/src:libs/providers/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src:services/ingestion/tests"
+mypy_path = "libs/common/src:libs/contracts/src:libs/db/src:libs/providers/src:libs/evaluation/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src:services/ingestion/tests"
 explicit_package_bases = true
 exclude = "(build|dist|\\.venv)"
 
@@ -63,6 +63,7 @@ source = [
     "libs/contracts/src",
     "libs/db/src",
     "libs/providers/src",
+    "libs/evaluation/src",
     "services/ingestion/src",
     "services/processing/src",
     "services/retrieval/src",

@@ -1,8 +1,8 @@
 # Project Status
 
-- **Current Phase:** 7 — Generation (starting)
-- **Completed:** Phases 0-6 (foundation; ingestion; worker; chunking; metadata filters; embeddings + pgvector HNSW; hybrid retrieval)
-- **Next:** Phase 7 generation service (Gemini answer synthesis, citations, memory)
+- **Current Phase:** 9 — Guardrails + OpenTelemetry (starting)
+- **Completed:** Phases 0-8 (foundation; ingestion; worker; chunking; metadata filters; embeddings + pgvector HNSW; hybrid retrieval; generation with citations; RAGAS evaluation)
+- **Next:** Phase 9 guardrails + OpenTelemetry
 - **Blocked:** none (real Gemini exercised via llm-smoke workflow)
-- **Tests:** 112 passed + 1 gated (CI/LLM-only), coverage 95%
-- **Last Commit:** feat(retrieval): hybrid search (vector KNN + Postgres FTS + RRF)
+- **Tests:** 148 passed + 11 gated (CI/LLM-only + Postgres-only), coverage 94%
+- **Last Commit:** feat(evaluation): minimal RAGAS-style answer-quality metrics (phase 8)

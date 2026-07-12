@@ -51,7 +51,7 @@ curl localhost:8001/health
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Foundation: monorepo, CI, quality gates, service skeletons | ✅ |
-| 1 | Document ingestion: upload, parsing, dedup, versioning | ⏳ |
+| 1 | Document ingestion: upload, parsing, dedup, versioning | ✅ |
 | 2 | Processing pipeline: jobs, workers, normalization | ⏳ |
 | 3 | Chunking strategies | ⏳ |
 | 4 | Metadata architecture | ⏳ |

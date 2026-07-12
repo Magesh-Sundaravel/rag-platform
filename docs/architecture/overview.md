@@ -56,6 +56,13 @@ sequenceDiagram
     G-->>C: answer + citations
 ```
 
+## Storage
+
+One shared Postgres instance in the MVP (ADR-0004). ORM models live in
+`libs/db` (`rag_db`); the ingestion service owns the single alembic
+migration lineage. Tables so far: `documents` (dedup by sha256 content
+hash, per-filename versioning), `jobs` (outbox for async processing).
+
 ## Key decisions
 
 See `docs/adr/`: monorepo+uv (0001), microservice boundaries (0002),

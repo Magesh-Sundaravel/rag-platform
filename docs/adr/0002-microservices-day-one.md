@@ -19,7 +19,7 @@ independently containerized and deployable. Boundary rules:
 3. Data exchanged across boundaries uses models from `libs/contracts` only.
 4. Each service owns its tables; other services access foreign data through
    the owning service's API — with a pragmatic MVP exception recorded in
-   ADR-0005 (shared database instance).
+   ADR-0004 (shared database instance).
 
 ## Consequences
 

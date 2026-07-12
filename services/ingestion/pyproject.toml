@@ -7,11 +7,16 @@ dependencies = [
     "rag-common",
     "rag-contracts",
     "uvicorn[standard]>=0.34",
+    "rag-db",
+    "pypdf>=5.1",
+    "python-multipart>=0.0.20",
+    "alembic>=1.14",
 ]
 
 [tool.uv.sources]
 rag-common = { workspace = true }
 rag-contracts = { workspace = true }
+rag-db = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -20,6 +20,7 @@ dev = [
     "mypy>=1.14",
     "ruff>=0.9",
     "pre-commit>=4.0",
+    "aiosqlite>=0.20",
 ]
 
 [tool.ruff]
@@ -42,7 +43,7 @@ convention = "google"
 strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
-mypy_path = "libs/common/src:libs/contracts/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src"
+mypy_path = "libs/common/src:libs/contracts/src:libs/db/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src:services/ingestion/tests"
 explicit_package_bases = true
 exclude = "(build|dist|\\.venv)"
 
@@ -56,9 +57,11 @@ testpaths = ["libs", "services"]
 addopts = "-q"
 
 [tool.coverage.run]
+concurrency = ["thread", "greenlet"]
 source = [
     "libs/common/src",
     "libs/contracts/src",
+    "libs/db/src",
     "services/ingestion/src",
     "services/processing/src",
     "services/retrieval/src",

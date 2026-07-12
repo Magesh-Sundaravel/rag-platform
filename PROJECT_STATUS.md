@@ -1,9 +1,8 @@
 # Project Status
 
-- **Current Phase:** 0 — Foundation (finishing)
-- **Completed:** workspace scaffold, libs/common + contracts, 4 service skeletons, quality gates (ruff/mypy strict/pytest 100% cov), compose, CI workflow, docs+ADR 0001-0003
-- **In Progress:** compose verification, GitHub repo + first push
-- **Next:** Phase 1 ingestion service
-- **Blocked:** real Gemini calls (no API key — building against provider fakes per ADR-0003)
-- **Tests:** 25 passed, coverage 100%
-- **Last Commit:** (pending initial commit)
+- **Current Phase:** 2 — Processing pipeline (starting)
+- **Completed:** Phase 0 foundation; Phase 1 ingestion (documents+jobs schema, alembic, upload/dedup/versioning API, job outbox)
+- **Next:** Phase 2 worker loop (Postgres job queue), normalization, metadata extraction
+- **Blocked:** real Gemini calls locally (key only in CI secret; provider fakes per ADR-0003)
+- **Tests:** 45 passed + 1 integration (CI-only), coverage 97%
+- **Last Commit:** feat(ingestion): document upload, dedup, versioning (phase 1)

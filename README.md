@@ -24,9 +24,10 @@ flowchart LR
 | `retrieval` | 8003 | Vector, full-text, and hybrid search |
 | `generation` | 8004 | RAG query API: retrieval + Gemini generation with citations |
 
-Shared code lives in `libs/common` (settings, logging, errors, app factory)
-and `libs/contracts` (cross-service Pydantic models). Services never import
-each other — only `libs/*` (see ADR-0002).
+Shared code lives in `libs/common` (settings, logging, errors, app factory),
+`libs/contracts` (cross-service Pydantic models), and `libs/db` (shared
+SQLAlchemy models + async session helpers, see ADR-0004). Services never
+import each other — only `libs/*` (see ADR-0002).
 
 ## Quickstart
 
@@ -51,7 +52,7 @@ curl localhost:8001/health
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Foundation: monorepo, CI, quality gates, service skeletons | ✅ |
-| 1 | Document ingestion: upload, parsing, dedup, versioning | ⏳ |
+| 1 | Document ingestion: upload, parsing, dedup, versioning | ✅ |
 | 2 | Processing pipeline: jobs, workers, normalization | ⏳ |
 | 3 | Chunking strategies | ⏳ |
 | 4 | Metadata architecture | ⏳ |

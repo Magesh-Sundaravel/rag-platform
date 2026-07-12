@@ -17,6 +17,7 @@ dev = [
     "pytest-asyncio>=0.25",
     "pytest-cov>=6.0",
     "httpx>=0.28",
+    "aiosqlite>=0.20",
     "mypy>=1.14",
     "ruff>=0.9",
     "pre-commit>=4.0",
@@ -42,9 +43,9 @@ convention = "google"
 strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
-mypy_path = "libs/common/src:libs/contracts/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src"
+mypy_path = "libs/common/src:libs/contracts/src:libs/db/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src"
 explicit_package_bases = true
-exclude = "(build|dist|\\.venv)"
+exclude = "(build|dist|\\.venv|alembic/versions)"
 
 [[tool.mypy.overrides]]
 module = "tests.*"
@@ -59,6 +60,7 @@ addopts = "-q"
 source = [
     "libs/common/src",
     "libs/contracts/src",
+    "libs/db/src",
     "services/ingestion/src",
     "services/processing/src",
     "services/retrieval/src",

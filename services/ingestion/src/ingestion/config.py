@@ -8,3 +8,4 @@ class Settings(BaseServiceSettings):
 
     service_name: str = "ingestion"
     port: int = 8001
+    database_url: str = "postgresql+asyncpg://rag:rag_dev_password@localhost:5432/rag"

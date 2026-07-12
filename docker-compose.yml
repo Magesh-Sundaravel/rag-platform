@@ -21,6 +21,7 @@ services:
       dockerfile: services/ingestion/Dockerfile
     environment:
       RAG_ENVIRONMENT: dev
+      RAG_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag_dev_password}@postgres:5432/${POSTGRES_DB:-rag}
     ports:
       - "8001:8001"
     depends_on:

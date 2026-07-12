@@ -1400,6 +1400,7 @@ dependencies = [
     { name = "rag-common" },
     { name = "rag-contracts" },
     { name = "rag-db" },
+    { name = "rag-providers" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1408,6 +1409,7 @@ requires-dist = [
     { name = "rag-common", editable = "libs/common" },
     { name = "rag-contracts", editable = "libs/contracts" },
     { name = "rag-db", editable = "libs/db" },
+    { name = "rag-providers", editable = "libs/providers" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
 ]
 

@@ -1,22 +1,21 @@
-# ADR-0003: Local-first development; GCP deferred
+# ADR-0003: Local-first development; production cloud deferred
 
 - **Status:** Accepted
 - **Date:** 2026-07-11
 
 ## Context
 
-No GCP project exists yet. Cloud resources cost money and slow the feedback
+No production cloud environment exists yet. Cloud resources cost money and slow the feedback
 loop during early development.
 
 ## Decision
 
 Develop everything locally with Docker Compose (Postgres+pgvector). LLM
 access is abstracted behind provider interfaces with deterministic fake
-implementations so the entire pipeline is testable offline; real Gemini
-providers (google-genai SDK) ship alongside and activate when
-`GEMINI_API_KEY` (or Vertex AI ADC) is configured. Full GCP infrastructure
-(Terraform, GKE, Cloud SQL, Artifact Registry) is written in Phase 10 and
-deployed when a billing-enabled project exists.
+implementations so the entire pipeline is testable offline; real Bedrock
+providers (`boto3` SDK) ship alongside and activate when AWS credentials and
+region are configured. Production cloud infrastructure is written in
+Phase 10 and deployed only after the target platform is selected and funded.
 
 ## Consequences
 

@@ -1,7 +1,7 @@
 [project]
 name = "rag-generation"
 version = "0.1.0"
-description = "Gemini-backed answer generation with citations"
+description = "Bedrock-backed answer generation with citations"
 requires-python = ">=3.12"
 dependencies = [
     "rag-common",

@@ -6,7 +6,7 @@ import random
 from collections.abc import Sequence
 from typing import Protocol
 
-DEFAULT_DIMENSION = 768
+DEFAULT_DIMENSION = 1024
 
 
 class EmbeddingProvider(Protocol):
@@ -37,7 +37,7 @@ class FakeEmbeddingProvider:
         """Configure the output dimension.
 
         Args:
-            dimension: Vector length (default 768, matching Gemini config).
+            dimension: Vector length (default 1024, matching Bedrock Titan config).
         """
         self.dimension = dimension
 

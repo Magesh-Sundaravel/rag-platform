@@ -1,14 +1,15 @@
-"""Tests for embedding providers (fake determinism + mocked Gemini)."""
+"""Tests for embedding providers (fake determinism + mocked Bedrock)."""
 
+import io
+import json
 import math
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from rag_providers.embedding import FakeEmbeddingProvider
 from rag_providers.factory import build_embedding_provider
-from rag_providers.gemini import GeminiEmbeddingProvider
+from rag_providers.bedrock import BedrockEmbeddingProvider
 
 
 async def test_fake_is_deterministic() -> None:
@@ -24,9 +25,9 @@ async def test_fake_differs_by_text() -> None:
 
 
 async def test_fake_dimension_and_norm() -> None:
-    provider = FakeEmbeddingProvider(dimension=768)
+    provider = FakeEmbeddingProvider(dimension=1024)
     [vec] = await provider.embed(["normalize me"])
-    assert len(vec) == 768
+    assert len(vec) == 1024
     assert math.isclose(math.sqrt(sum(v * v for v in vec)), 1.0, rel_tol=1e-9)
 
 
@@ -48,29 +49,28 @@ def test_factory_rejects_unknown() -> None:
         build_embedding_provider("openai")
 
 
-def _mock_genai_client(embeddings: list[Any]) -> MagicMock:
+def _mock_bedrock_client(embedding: list[float] | None) -> MagicMock:
     client = MagicMock()
-    response = MagicMock()
-    response.embeddings = embeddings
-    client.aio.models.embed_content = AsyncMock(return_value=response)
+    payload = {} if embedding is None else {"embedding": embedding}
+    client.invoke_model.return_value = {"body": io.BytesIO(json.dumps(payload).encode())}
     return client
 
 
-async def test_gemini_provider_maps_response() -> None:
-    emb = MagicMock()
-    emb.values = [0.1, 0.2, 0.3]
-    client = _mock_genai_client([emb])
-    provider = GeminiEmbeddingProvider(dimension=3, client=client)
+async def test_bedrock_provider_maps_response() -> None:
+    client = _mock_bedrock_client([0.1, 0.2, 0.3])
+    provider = BedrockEmbeddingProvider(dimension=3, client=client)
     result = await provider.embed(["hi"])
     assert result == [[0.1, 0.2, 0.3]]
-    call = client.aio.models.embed_content.call_args
-    assert call.kwargs["model"] == "gemini-embedding-001"
-    assert call.kwargs["contents"] == ["hi"]
-    assert call.kwargs["config"].output_dimensionality == 3
+    call = client.invoke_model.call_args
+    assert call.kwargs["modelId"] == "amazon.titan-embed-text-v2:0"
+    body = json.loads(call.kwargs["body"])
+    assert body["inputText"] == "hi"
+    assert body["dimensions"] == 3
+    assert body["normalize"] is True
 
 
-async def test_gemini_provider_raises_on_empty() -> None:
-    client = _mock_genai_client([])
-    provider = GeminiEmbeddingProvider(client=client)
-    with pytest.raises(RuntimeError, match="no embeddings"):
+async def test_bedrock_provider_raises_on_empty() -> None:
+    client = _mock_bedrock_client(None)
+    provider = BedrockEmbeddingProvider(client=client)
+    with pytest.raises(RuntimeError, match="no embedding"):
         await provider.embed(["hi"])

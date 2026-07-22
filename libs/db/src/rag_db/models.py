@@ -16,7 +16,7 @@ from sqlalchemy.sql import func
 
 PortableJSON = JSONB().with_variant(JSON(), "sqlite")
 
-EMBEDDING_DIMENSION = 768
+EMBEDDING_DIMENSION = 1024
 
 
 class Base(DeclarativeBase):

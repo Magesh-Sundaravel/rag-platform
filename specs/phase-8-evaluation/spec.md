@@ -35,7 +35,7 @@ adopting the `ragas` package's own LLM-integration layer (see ADR-0007).
    supported answer, a partially unsupported answer (hallucination), and
    an irrelevant-context case.
 3. `llm_smoke`-marked test: runs `evaluate()` over the golden dataset with
-   the real `GeminiGenerationProvider` as judge; asserts scores land in
+   the real `BedrockGenerationProvider` as judge; asserts scores land in
    `[0, 1]` and the fully-supported example scores higher on faithfulness
    than the hallucination example.
 
@@ -60,7 +60,7 @@ adopting the `ragas` package's own LLM-integration layer (see ADR-0007).
 - [x] All four metrics return values in `[0, 1]` for well-formed judge
       output and degrade gracefully (score `0.0`) on malformed output.
 - [x] `evaluate()` produces per-example scores and correct averages.
-- [x] llm-smoke run scores the golden dataset with real Gemini and the
+- [x] llm-smoke run scores the golden dataset with real Bedrock and the
       hallucination example scores lower on faithfulness than the
       fully-supported one.
 - [x] Gates green.

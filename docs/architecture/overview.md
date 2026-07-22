@@ -3,7 +3,7 @@
 ## System context
 
 Four FastAPI microservices in a uv-workspace monorepo, one PostgreSQL
-instance with pgvector, Gemini as the LLM provider (behind swappable
+instance with pgvector, Amazon Bedrock as the LLM provider (behind swappable
 provider interfaces).
 
 ```mermaid
@@ -18,7 +18,7 @@ flowchart TB
         GEN[generation :8004]
         PG[(PostgreSQL + pgvector)]
     end
-    LLM[Gemini API]
+    LLM[Amazon Bedrock]
 
     U -->|POST /documents| ING
     U -->|POST /query| GEN
@@ -40,7 +40,7 @@ sequenceDiagram
     participant P as processing
     participant R as retrieval
     participant G as generation
-    participant L as Gemini
+    participant L as Bedrock
 
     C->>I: POST /documents (file)
     I->>DB: insert document (dedup by content hash) + job
@@ -90,9 +90,9 @@ filters to SQL predicates in `retrieval/filters.py`.
 ## Embeddings
 
 Provider protocols + deterministic fakes live in `libs/providers`
-(ADR-0006). Production uses Gemini `gemini-embedding-001` (768 dims,
-`google-genai` SDK, `GEMINI_API_KEY`). Chunk vectors persist to
-`chunks.embedding vector(768)` with an HNSW cosine index. Real-LLM smoke
+(ADR-0006). Production uses Bedrock Titan Text Embeddings V2
+(`amazon.titan-embed-text-v2:0`, 1024 dims, `boto3` SDK). Chunk vectors persist to
+`chunks.embedding vector(1024)` with an HNSW cosine index. Real-LLM smoke
 tests run in the `llm-smoke` workflow only.
 
 ## Evaluation
@@ -101,7 +101,7 @@ tests run in the `llm-smoke` workflow only.
 (faithfulness, answer relevancy, context precision/recall) via
 judge-prompted scoring over the existing `GenerationProvider` abstraction —
 no separate LLM-integration path (ADR-0007). A 3-example golden dataset
-runs through the real Gemini judge in the `llm-smoke` workflow.
+runs through the real Bedrock judge in the `llm-smoke` workflow.
 
 ## Guardrails and observability
 

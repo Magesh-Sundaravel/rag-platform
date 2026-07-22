@@ -37,7 +37,7 @@ collectors, or secrets.
   unit-tested without fakes or mocks.
 - Tracing is genuinely opt-in: `docker compose` local dev and `pytest` never
   spin up exporters or background threads; pointing
-  `RAG_OTEL_EXPORTER_ENDPOINT` at a collector (e.g. in GCP later, Phase 10)
+  `RAG_OTEL_EXPORTER_ENDPOINT` at a collector (e.g. in AWS later, Phase 10)
   is a config-only change, no code change.
 - Regex-based guardrails are a known-limited approach (won't catch novel
   phrasing); documented as a limitation in `specs/phase-9-guardrails-otel/spec.md`.

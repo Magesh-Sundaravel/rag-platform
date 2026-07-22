@@ -16,7 +16,7 @@ from rag_db.models import Chunk, Document, Job
 from rag_providers.embedding import FakeEmbeddingProvider
 
 CHUNKER = RecursiveCharacterChunker(200, 20)
-EMBEDDER = FakeEmbeddingProvider()  # 768 dims to satisfy vector(768)
+EMBEDDER = FakeEmbeddingProvider()  # 1024 dims to satisfy vector(1024)
 
 DB_URL = os.environ.get("RAG_TEST_DB_URL", "")
 pytestmark = pytest.mark.skipif(not DB_URL, reason="RAG_TEST_DB_URL not set")
@@ -102,4 +102,4 @@ async def test_run_once_processes_on_postgres(
         assert chunks
         assert chunks[0].meta["filename"] == doc.filename
         assert chunks[0].embedding is not None
-        assert len(chunks[0].embedding) == 768
+        assert len(chunks[0].embedding) == 1024

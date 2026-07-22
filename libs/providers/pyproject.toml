@@ -1,10 +1,10 @@
 [project]
 name = "rag-providers"
 version = "0.1.0"
-description = "LLM provider protocols, deterministic fakes, and Gemini implementations (ADR-0006)"
+description = "LLM provider protocols, deterministic fakes, and Bedrock implementations (ADR-0006)"
 requires-python = ">=3.12"
 dependencies = [
-    "google-genai>=1.20",
+    "boto3>=1.43",
 ]
 
 [build-system]

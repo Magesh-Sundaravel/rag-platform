@@ -18,8 +18,8 @@ real service boundary (generation -> retrieval via HTTP, per ADR-0002).
 2. `FakeGenerationProvider`: deterministic; echoes the numbered context
    block ids it sees (`[1] [2] ...`) so citation extraction is fully
    testable offline.
-3. `GeminiGenerationProvider`: `gemini-2.5-flash` via google-genai; maps
-   `usage_metadata`.
+3. `BedrockGenerationProvider`: `amazon.nova-micro-v1:0` via Bedrock
+   Converse API; maps Bedrock token usage.
 4. `POST /query` on the generation service: `{question, top_k, filters?}`:
    - calls retrieval `POST /search` over HTTP (httpx, configurable
      timeout, retries with backoff on 5xx/transport errors),
@@ -44,7 +44,7 @@ real service boundary (generation -> retrieval via HTTP, per ADR-0002).
   generation provider.
 - Retry behavior: mock transport with a stateful handler (5xx then
   success).
-- Real Gemini generation: llm-smoke test.
+- Real Bedrock generation: llm-smoke test.
 
 ## Acceptance Criteria
 

@@ -21,8 +21,8 @@ on purpose — its output is the skeleton every other phase builds on.
 | Decision | Choice | Rationale |
 |---|---|---|
 | Service structure | Microservices from day 1, in a **monorepo** | Portfolio demonstrates distributed systems; monorepo keeps tooling/CI/contracts unified |
-| Cloud timing | Local-first; GCP only for Vertex AI (Phase 5+); full infra Phase 10 | Fast feedback, near-zero cost during development |
-| GCP status | Account exists, no project yet | Project setup deferred to Phase 5 pre-work |
+| Cloud timing | Local-first; provider-backed LLM access when needed; full infra deferred to Phase 10 | Fast feedback, near-zero cost during development |
+| Cloud status | No production cloud environment yet | Infrastructure setup deferred until deployment phase |
 | Python | 3.12 | Mature wheel/SDK support across the ML ecosystem |
 
 ## 3. Goals
@@ -43,7 +43,7 @@ on purpose — its output is the skeleton every other phase builds on.
 - Any RAG functionality (upload, parsing, chunking, embedding, retrieval, generation).
 - Inter-service communication (HTTP clients, queues) — the *decision* is recorded in an ADR, the implementation lands in Phase 2.
 - Database schemas/migrations (Phase 1).
-- Terraform, GKE, any GCP resource (Phase 10; GCP project creation in Phase 5 pre-work).
+- Terraform, ECS/EKS, RDS, or any production cloud resource (Phase 10 deployment work).
 - Authentication/authorization (Phase 4).
 - Kubernetes manifests.
 
@@ -56,7 +56,7 @@ on purpose — its output is the skeleton every other phase builds on.
 | `ingestion` | 8001 | Document upload, parsing, dedup, versioning | FastAPI app with `/health`, `/ready` |
 | `processing` | 8002 | Async pipeline: normalization, chunking, embedding | Same skeleton (becomes a worker in Phase 2) |
 | `retrieval` | 8003 | Vector/BM25/hybrid search, reranking | Same skeleton |
-| `generation` | 8004 | Gemini generation, prompts, citations, memory | Same skeleton |
+| `generation` | 8004 | Bedrock generation, prompts, citations, memory | Same skeleton |
 
 Each service: its own `pyproject.toml` (uv workspace member), own
 `Dockerfile`, own `tests/`. Each exposes `GET /health` (liveness, always 200)
@@ -133,13 +133,13 @@ docker-build (matrix over 4 services; build only, no push)
 ```
 
 Jobs run in parallel where independent; `docker-build` uses layer caching.
-Pushing images to Artifact Registry is Phase 10.
+Pushing images to ECR is Phase 10.
 
 ## 6. ADRs to be written in this phase
 
 1. **ADR-0001**: Monorepo with uv workspace for a multi-service platform.
 2. **ADR-0002**: Microservices from day 1; service boundary and import rules.
-3. **ADR-0003**: Local-first development; GCP deferred to Phase 5 (Vertex AI) and Phase 10 (infra).
+3. **ADR-0003**: Local-first development; production cloud deferred until deployment work.
 
 ## 7. Testing Strategy for Phase 0
 

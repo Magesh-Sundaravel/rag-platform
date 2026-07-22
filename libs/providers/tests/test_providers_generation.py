@@ -1,11 +1,11 @@
-"""Tests for generation providers (fake determinism + mocked Gemini)."""
+"""Tests for generation providers (fake determinism + mocked Bedrock)."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from rag_providers.factory import build_generation_provider
-from rag_providers.gemini import GeminiGenerationProvider
+from rag_providers.bedrock import BedrockGenerationProvider
 from rag_providers.generation import FakeGenerationProvider
 
 
@@ -40,23 +40,22 @@ def test_factory_rejects_unknown() -> None:
         build_generation_provider("openai")
 
 
-def _mock_genai_client(text: str, prompt_tokens: int, completion_tokens: int) -> MagicMock:
+def _mock_bedrock_client(text: str, prompt_tokens: int, completion_tokens: int) -> MagicMock:
     client = MagicMock()
-    response = MagicMock()
-    response.text = text
-    response.usage_metadata.prompt_token_count = prompt_tokens
-    response.usage_metadata.candidates_token_count = completion_tokens
-    client.aio.models.generate_content = AsyncMock(return_value=response)
+    client.converse.return_value = {
+        "output": {"message": {"content": [{"text": text}]}},
+        "usage": {"inputTokens": prompt_tokens, "outputTokens": completion_tokens},
+    }
     return client
 
 
-async def test_gemini_provider_maps_response() -> None:
-    client = _mock_genai_client("the answer [1]", prompt_tokens=12, completion_tokens=3)
-    provider = GeminiGenerationProvider(client=client)
+async def test_bedrock_provider_maps_response() -> None:
+    client = _mock_bedrock_client("the answer [1]", prompt_tokens=12, completion_tokens=3)
+    provider = BedrockGenerationProvider(client=client)
     result = await provider.generate("a prompt")
     assert result.text == "the answer [1]"
     assert result.prompt_tokens == 12
     assert result.completion_tokens == 3
-    call = client.aio.models.generate_content.call_args
-    assert call.kwargs["model"] == "gemini-2.5-flash"
-    assert call.kwargs["contents"] == "a prompt"
+    call = client.converse.call_args
+    assert call.kwargs["modelId"] == "amazon.nova-micro-v1:0"
+    assert call.kwargs["messages"] == [{"role": "user", "content": [{"text": "a prompt"}]}]

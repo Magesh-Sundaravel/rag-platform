@@ -42,7 +42,7 @@ see per-service latency/error rates.
 - LLM-judged safety classification (ADR-0008 — heuristics only).
 - Tracing database queries (SQLAlchemy instrumentation) or the async
   worker loop; scoped to HTTP request spans for this phase.
-- A deployed collector (Phase 10, GCP deployment, will wire a real
+- A deployed collector (Phase 10, AWS deployment, will wire a real
   endpoint).
 
 ## Testing

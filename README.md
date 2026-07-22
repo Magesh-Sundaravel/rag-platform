@@ -13,8 +13,8 @@ flowchart LR
     PROC[processing :8002] -->|poll jobs, write chunks + embeddings| PG
     RET[retrieval :8003] -->|vector + FTS hybrid search| PG
     GEN -->|HTTP /search| RET
-    GEN -->|LLM| GEMINI[Gemini API]
-    PROC -->|embeddings| GEMINI
+    GEN -->|LLM| BEDROCK[Amazon Bedrock]
+    PROC -->|embeddings| BEDROCK
 ```
 
 | Service | Port | Responsibility |
@@ -22,7 +22,7 @@ flowchart LR
 | `ingestion` | 8001 | Document upload, parsing, deduplication, versioning |
 | `processing` | 8002 | Async pipeline: normalization, chunking, embedding |
 | `retrieval` | 8003 | Vector, full-text, and hybrid search |
-| `generation` | 8004 | RAG query API: retrieval + Gemini generation with citations |
+| `generation` | 8004 | RAG query API: retrieval + Bedrock generation with citations |
 
 Shared code lives in `libs/common` (settings, logging, errors, app factory,
 tracing), `libs/contracts` (cross-service Pydantic models), `libs/evaluation`
@@ -57,11 +57,11 @@ curl localhost:8001/health
 | 2 | Processing pipeline: jobs, workers, normalization | ✅ |
 | 3 | Chunking strategies | ✅ |
 | 4 | Metadata architecture | ✅ |
-| 5 | Gemini embeddings + pgvector | ✅ |
+| 5 | Bedrock embeddings + pgvector | ✅ |
 | 6 | Retrieval: vector + BM25 + hybrid + rerank | ✅ |
-| 7 | Generation: Gemini, citations, memory | ✅ |
+| 7 | Generation: Bedrock, citations, memory | ✅ |
 | 8 | RAGAS evaluation framework | ✅ |
 | 9 | Guardrails + OpenTelemetry | ✅ |
-| 10 | GCP deployment: Terraform, GKE, Cloud SQL | ⏳ |
+| 10 | AWS deployment: Terraform, ECS Fargate, RDS PostgreSQL | ⏳ |
 
 See [PROJECT_STATUS.md](PROJECT_STATUS.md) for live progress.

@@ -34,7 +34,7 @@
 
 No new protocol: the judge parameter is typed `GenerationProvider` (from
 `rag_providers.generation`), the same protocol used for answer generation
-in Phase 7. `build_generation_provider("gemini")` builds the real judge;
+in Phase 7. `build_generation_provider("bedrock")` builds the real judge;
 tests use a module-local `StubJudge` (implements `generate` by returning a
 canned `GenerationResult`), not `FakeGenerationProvider` — that fake is
 purpose-built for citation-echoing, not score output.

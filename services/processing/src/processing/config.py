@@ -16,4 +16,4 @@ class Settings(BaseServiceSettings):
     chunk_strategy: Literal["fixed", "recursive"] = "recursive"
     chunk_size: int = 1200
     chunk_overlap: int = 200
-    embedding_provider: Literal["fake", "gemini"] = "fake"
+    embedding_provider: Literal["fake", "bedrock"] = "fake"

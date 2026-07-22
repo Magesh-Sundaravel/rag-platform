@@ -11,4 +11,4 @@ class Settings(BaseServiceSettings):
     service_name: str = "retrieval"
     port: int = 8003
     database_url: str = "postgresql+asyncpg://rag:rag_dev_password@localhost:5432/rag"
-    embedding_provider: Literal["fake", "gemini"] = "fake"
+    embedding_provider: Literal["fake", "bedrock"] = "fake"

@@ -1,20 +1,21 @@
-"""Real Gemini-judge evaluation smoke test (llm-smoke workflow only)."""
+"""Real Bedrock-judge evaluation smoke test (llm-smoke workflow only)."""
 
 import os
 
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("GEMINI_API_KEY"), reason="GEMINI_API_KEY not set"
+    not (os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")),
+    reason="AWS region not set for Bedrock",
 )
 
 
-async def test_real_gemini_evaluation() -> None:
+async def test_real_bedrock_evaluation() -> None:
     from rag_evaluation.golden import GOLDEN_EXAMPLES
     from rag_evaluation.runner import evaluate
-    from rag_providers.gemini import GeminiGenerationProvider
+    from rag_providers.bedrock import BedrockGenerationProvider
 
-    judge = GeminiGenerationProvider()
+    judge = BedrockGenerationProvider()
     report = await evaluate(GOLDEN_EXAMPLES, judge)
 
     for result in report.results:

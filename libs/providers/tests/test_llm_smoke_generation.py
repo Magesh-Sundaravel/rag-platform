@@ -1,18 +1,19 @@
-"""Real Gemini generation smoke test (llm-smoke workflow only)."""
+"""Real Bedrock generation smoke test (llm-smoke workflow only)."""
 
 import os
 
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("GEMINI_API_KEY"), reason="GEMINI_API_KEY not set"
+    not (os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")),
+    reason="AWS region not set for Bedrock",
 )
 
 
-async def test_real_gemini_generation() -> None:
-    from rag_providers.gemini import GeminiGenerationProvider
+async def test_real_bedrock_generation() -> None:
+    from rag_providers.bedrock import BedrockGenerationProvider
 
-    provider = GeminiGenerationProvider()
+    provider = BedrockGenerationProvider()
     prompt = "[1] Paris is the capital of France.\n\nQuestion: what is the capital of France?"
     result = await provider.generate(prompt)
     assert result.text

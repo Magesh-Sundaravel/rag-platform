@@ -1,0 +1,100 @@
+name: AWS Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Terraform workspace/environment"
+        required: true
+        default: "prod"
+      apply:
+        description: "Set to true to apply Terraform after validation/plan"
+        required: true
+        default: "false"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/aws-deploy.yml"
+      - "infra/aws/**"
+      - "services/**/Dockerfile"
+      - "services/**/alembic/**"
+      - "services/**/alembic.ini"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-1
+  ECR_REPOSITORY_PREFIX: rag-platform-prod
+
+jobs:
+  terraform-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/aws
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - run: terraform init -backend=false
+      - run: terraform fmt -check -recursive
+      - run: terraform validate
+
+  docker-push:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    strategy:
+      matrix:
+        service: [ingestion, processing, retrieval, generation]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_PREFIX }}-${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  terraform-plan-apply:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    needs: docker-push
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: infra/aws
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - run: terraform init
+      - run: terraform fmt -check -recursive
+      - name: Terraform plan
+        run: |
+          terraform plan \
+            -input=false \
+            -var "aws_region=${AWS_REGION}" \
+            -var "environment=${{ inputs.environment }}" \
+            -var "db_password=${{ secrets.RAG_DB_PASSWORD }}" \
+            -var "service_image_tag=${GITHUB_SHA}" \
+            -out=tfplan
+      - name: Terraform apply
+        if: inputs.apply == 'true'
+        run: terraform apply -input=false tfplan

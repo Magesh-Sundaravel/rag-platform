@@ -41,12 +41,28 @@ make up                  # postgres + all 4 services via docker compose
 curl localhost:8001/health
 ```
 
+## Deployment
+
+Local development stays on Docker Compose. AWS deployment artifacts for Phase 10
+live in [`infra/aws/`](infra/aws/) and the operator runbook is
+[`docs/deployment/aws.md`](docs/deployment/aws.md).
+
+Typical deployment flow:
+
+```bash
+cd infra/aws
+terraform init
+terraform validate
+terraform apply
+```
+
 ## Development
 
 - **Package manager:** [uv](https://docs.astral.sh/uv/) workspace, single lockfile
 - **Quality gates:** Ruff (lint+format), mypy `--strict`, pytest with ≥90% coverage
 - **Workflow:** spec-driven — every phase has `specs/phase-N-*/spec.md`, `design.md`, `tasks.md`
 - **Docs:** `docs/adr/` for decisions, `docs/architecture/` for diagrams, `docs/setup.md` for onboarding
+- **Deployment:** `infra/aws/` Terraform stack + [`docs/deployment/aws.md`](docs/deployment/aws.md) runbook
 
 ## Roadmap
 

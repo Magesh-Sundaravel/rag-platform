@@ -1,0 +1,27 @@
+aws_region  = "eu-west-1"
+environment = "prod"
+
+# Set a strong value through CI secret material or a secure tfvars file
+# that is never committed.
+db_password = "replace-me"
+
+service_image_tag = "main"
+
+service_environment = {
+  processing = {
+    RAG_CHUNK_SIZE = "1200"
+  }
+}
+
+# Each value should be a full Secrets Manager ARN or SSM parameter ARN.
+service_secrets = {
+  processing = {
+    AWS_REGION = "arn:aws:ssm:eu-west-1:123456789012:parameter/rag/prod/aws-region"
+  }
+  retrieval = {
+    AWS_REGION = "arn:aws:ssm:eu-west-1:123456789012:parameter/rag/prod/aws-region"
+  }
+  generation = {
+    AWS_REGION = "arn:aws:ssm:eu-west-1:123456789012:parameter/rag/prod/aws-region"
+  }
+}

@@ -35,3 +35,10 @@ Verify: `curl localhost:8001/health` … `:8004/health` all return
 - Decisions go in `docs/adr/` (sequential numbering).
 - Tests live next to the code they test (`libs/*/tests`, `services/*/tests`);
   test files need unique basenames across the repo (pytest rootdir constraint).
+
+## AWS deployment
+
+Phase 10 deployment artifacts live under [`infra/aws`](../infra/aws) with the
+operator runbook in [`docs/deployment/aws.md`](deployment/aws.md). Use that
+path for Terraform validation, ECR image publishing, ECS rollout, migration,
+and smoke-test steps.

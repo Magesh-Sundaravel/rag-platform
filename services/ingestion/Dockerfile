@@ -12,6 +12,8 @@ FROM python:3.12-slim
 RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
+COPY services/ingestion/alembic ./services/ingestion/alembic
+COPY services/ingestion/alembic.ini ./services/ingestion/alembic.ini
 ENV PATH="/app/.venv/bin:$PATH"
 USER app
 EXPOSE 8001

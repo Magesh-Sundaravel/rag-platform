@@ -21,5 +21,11 @@ htmlcov/
 .idea/
 .vscode/
 
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+
 # OS
 .DS_Store

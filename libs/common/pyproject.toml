@@ -5,6 +5,7 @@ description = "Shared foundation: settings, logging, exceptions, FastAPI app fac
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
+    "httpx>=0.28",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
     "structlog>=24.4",

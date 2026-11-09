@@ -44,15 +44,15 @@ locals {
       env = merge(
         local.base_environment,
         {
-          RAG_SERVICE_NAME           = "processing"
-          RAG_PORT                   = "8002"
-          RAG_EMBEDDING_PROVIDER     = "bedrock"
-          RAG_WORKER_ENABLED         = "true"
-          RAG_PROCESSING_QUEUE_URL   = aws_sqs_queue.processing.url
-          RAG_MAX_RECEIVE_COUNT      = tostring(local.processing_max_receive_count)
-          RAG_CHUNK_STRATEGY         = "recursive"
-          RAG_CHUNK_SIZE             = "1200"
-          RAG_CHUNK_OVERLAP          = "200"
+          RAG_SERVICE_NAME         = "processing"
+          RAG_PORT                 = "8002"
+          RAG_EMBEDDING_PROVIDER   = "bedrock"
+          RAG_WORKER_ENABLED       = "true"
+          RAG_PROCESSING_QUEUE_URL = aws_sqs_queue.processing.url
+          RAG_MAX_RECEIVE_COUNT    = tostring(local.processing_max_receive_count)
+          RAG_CHUNK_STRATEGY       = "recursive"
+          RAG_CHUNK_SIZE           = "1200"
+          RAG_CHUNK_OVERLAP        = "200"
         },
         lookup(var.service_environment, "processing", {})
       )
@@ -82,12 +82,12 @@ locals {
       env = merge(
         local.base_environment,
         {
-          RAG_SERVICE_NAME             = "generation"
-          RAG_PORT                     = "8004"
-          RAG_GENERATION_PROVIDER      = "bedrock"
-          RAG_RETRIEVAL_URL            = "http://retrieval.${local.cloudmap_namespace}:8003"
-          RAG_REQUEST_TIMEOUT_SECONDS  = "10.0"
-          RAG_RETRIEVAL_RETRIES        = "2"
+          RAG_SERVICE_NAME            = "generation"
+          RAG_PORT                    = "8004"
+          RAG_GENERATION_PROVIDER     = "bedrock"
+          RAG_RETRIEVAL_URL           = "http://retrieval.${local.cloudmap_namespace}:8003"
+          RAG_REQUEST_TIMEOUT_SECONDS = "10.0"
+          RAG_RETRIEVAL_RETRIES       = "2"
         },
         lookup(var.service_environment, "generation", {})
       )

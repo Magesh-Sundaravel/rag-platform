@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from rag_providers.factory import build_generation_provider
 from rag_providers.bedrock import BedrockGenerationProvider
+from rag_providers.factory import build_generation_provider
 from rag_providers.generation import FakeGenerationProvider
 
 

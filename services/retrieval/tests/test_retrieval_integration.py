@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from rag_contracts.filters import FilterOp, MetadataFilter
@@ -54,6 +55,9 @@ async def seed_chunks(factory: async_sessionmaker[AsyncSession]) -> dict[str, Ch
         "irrelevant": "Quarterly revenue grew twelve percent year over year.",
     }
     async with factory() as session:
+        # The DB is shared by every test in this module; clear earlier seeds so
+        # identical chunks don't tie with (and outrank) this test's chunks.
+        await session.execute(delete(Document))  # chunks cascade via FK
         doc = Document(
             filename="animals.txt",
             content_type="text/plain",

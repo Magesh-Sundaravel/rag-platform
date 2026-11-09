@@ -1,16 +1,18 @@
-"""Worker/job-queue tests on SQLite (claim, done, retry, dead-letter)."""
+"""SQS consumer tests on SQLite with an in-memory fake SQS client."""
 
 import asyncio
+import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
+from processing_test_helpers import FailingEmbedder, FakeSqs
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from processing.chunking import RecursiveCharacterChunker
-from processing.worker import claim_job, run_once, worker_loop
-from rag_db.models import Base, Chunk, Document, Job
+from processing.worker import QueueConfig, handle_message, run_once, worker_loop
+from rag_db.models import Base, Chunk, Document
 from rag_providers.embedding import FakeEmbeddingProvider
 
 CHUNKER = RecursiveCharacterChunker(200, 20)
@@ -28,44 +30,50 @@ async def factory(tmp_path: Path) -> AsyncIterator[async_sessionmaker[AsyncSessi
     await engine.dispose()
 
 
+@pytest.fixture
+def sqs() -> FakeSqs:
+    return FakeSqs()
+
+
+def queue_for(sqs: FakeSqs, max_receive_count: int = 3) -> QueueConfig:
+    return QueueConfig(client=sqs, url="q", wait_seconds=0, max_receive_count=max_receive_count)
+
+
+def message_for(document_id: uuid.UUID) -> str:
+    return f'{{"document_id": "{document_id}"}}'
+
+
 async def seed(
-    factory: async_sessionmaker[AsyncSession],
-    *,
-    job_type: str = "process_document",
-    raw_text: str = "# Title\nSome body text.",
-    max_attempts: int = 3,
-) -> tuple[Document, Job]:
+    factory: async_sessionmaker[AsyncSession], *, raw_text: str = "# Title\nSome body text."
+) -> Document:
     async with factory() as session:
         doc = Document(
             filename="a.md",
             content_type="text/markdown",
-            content_hash="c" * 64,
+            content_hash=uuid.uuid4().hex + uuid.uuid4().hex,
             version=1,
             status="pending",
             raw_text=raw_text,
         )
         session.add(doc)
-        await session.flush()
-        job = Job(
-            document_id=doc.id, job_type=job_type, status="pending", max_attempts=max_attempts
-        )
-        session.add(job)
         await session.commit()
-        return doc, job
+        return doc
 
 
-async def test_claim_empty_queue(factory: async_sessionmaker[AsyncSession]) -> None:
-    async with factory() as session:
-        assert await claim_job(session) is None
-
-
-async def test_successful_job_marks_document_processed(
-    factory: async_sessionmaker[AsyncSession],
+async def test_run_once_returns_false_when_idle(
+    factory: async_sessionmaker[AsyncSession], sqs: FakeSqs
 ) -> None:
-    doc, job = await seed(factory)
-    assert await run_once(factory, CHUNKER, EMBEDDER) is True
+    assert await run_once(factory, queue_for(sqs), CHUNKER, EMBEDDER) is False
+
+
+async def test_success_marks_processed_and_deletes_message(
+    factory: async_sessionmaker[AsyncSession], sqs: FakeSqs
+) -> None:
+    doc = await seed(factory)
+    handle = sqs.put(message_for(doc.id))
+    assert await run_once(factory, queue_for(sqs), CHUNKER, EMBEDDER) is True
+    assert sqs.deleted == [handle]
     async with factory() as session:
-        assert (await session.get(Job, job.id)).status == "done"  # type: ignore[union-attr]
         assert (await session.get(Document, doc.id)).status == "processed"  # type: ignore[union-attr]
         chunks = (await session.scalars(select(Chunk).where(Chunk.document_id == doc.id))).all()
         assert chunks
@@ -75,65 +83,103 @@ async def test_successful_job_marks_document_processed(
         assert len(chunks[0].embedding) == 8
 
 
-async def test_reprocessing_replaces_chunks(
-    factory: async_sessionmaker[AsyncSession],
+async def test_duplicate_delivery_replaces_chunks(
+    factory: async_sessionmaker[AsyncSession], sqs: FakeSqs
 ) -> None:
-    doc, _job = await seed(factory)
-    assert await run_once(factory, CHUNKER, EMBEDDER) is True
-    async with factory() as session:
-        session.add(Job(document_id=doc.id, job_type="process_document", status="pending"))
-        await session.commit()
-    assert await run_once(factory, CHUNKER, EMBEDDER) is True
+    doc = await seed(factory)
+    sqs.put(message_for(doc.id))
+    sqs.put(message_for(doc.id))
+    assert await run_once(factory, queue_for(sqs), CHUNKER, EMBEDDER) is True
+    assert await run_once(factory, queue_for(sqs), CHUNKER, EMBEDDER) is True
     async with factory() as session:
         chunks = (await session.scalars(select(Chunk).where(Chunk.document_id == doc.id))).all()
         indexes = sorted(c.chunk_index for c in chunks)
         assert indexes == list(range(len(chunks)))
 
 
-async def test_unknown_job_type_retries_then_dies(
-    factory: async_sessionmaker[AsyncSession],
+async def test_failure_retries_then_marks_failed_on_last_attempt(
+    factory: async_sessionmaker[AsyncSession], sqs: FakeSqs
 ) -> None:
-    doc, job = await seed(factory, job_type="bogus", max_attempts=2)
-    assert await run_once(factory, CHUNKER, EMBEDDER) is True
+    doc = await seed(factory)
+    sqs.put(message_for(doc.id))
+    queue = queue_for(sqs, max_receive_count=2)
+
+    assert await run_once(factory, queue, CHUNKER, FailingEmbedder()) is True
+    assert sqs.deleted == []
     async with factory() as session:
-        refreshed = await session.get(Job, job.id)
-        assert refreshed is not None
-        assert refreshed.status == "pending"
-        assert refreshed.attempts == 1
-        assert "unknown job type" in (refreshed.last_error or "")
-    assert await run_once(factory, CHUNKER, EMBEDDER) is True
+        assert (await session.get(Document, doc.id)).status == "pending"  # type: ignore[union-attr]
+
+    assert await run_once(factory, queue, CHUNKER, FailingEmbedder()) is True
+    assert sqs.deleted == []  # left for SQS redrive to move to the DLQ
     async with factory() as session:
-        refreshed = await session.get(Job, job.id)
-        assert refreshed is not None
-        assert refreshed.status == "dead"
-        document = await session.get(Document, doc.id)
-        assert document is not None
-        assert document.status == "failed"
+        assert (await session.get(Document, doc.id)).status == "failed"  # type: ignore[union-attr]
 
 
-async def test_run_once_returns_false_when_idle(
-    factory: async_sessionmaker[AsyncSession],
+async def test_missing_document_is_acknowledged(
+    factory: async_sessionmaker[AsyncSession], sqs: FakeSqs
 ) -> None:
-    assert await run_once(factory, CHUNKER, EMBEDDER) is False
+    handle = sqs.put(message_for(uuid.uuid4()))
+    assert await run_once(factory, queue_for(sqs), CHUNKER, EMBEDDER) is True
+    assert sqs.deleted == [handle]
+
+
+async def test_invalid_body_is_left_for_dlq(factory: async_sessionmaker[AsyncSession]) -> None:
+    message = {"Body": "not json", "ReceiptHandle": "h", "Attributes": {}}
+    assert await handle_message(factory, message, CHUNKER, EMBEDDER, max_receive_count=3) is False
 
 
 async def test_worker_loop_processes_and_stops(
-    factory: async_sessionmaker[AsyncSession],
+    factory: async_sessionmaker[AsyncSession], sqs: FakeSqs
 ) -> None:
-    _doc, job = await seed(factory)
+    doc = await seed(factory)
+    sqs.put(message_for(doc.id))
     stop = asyncio.Event()
     task = asyncio.create_task(
-        worker_loop(factory, CHUNKER, EMBEDDER, poll_interval=0.01, stop_event=stop)
+        worker_loop(factory, queue_for(sqs), CHUNKER, EMBEDDER, stop_event=stop)
     )
     for _ in range(100):
         await asyncio.sleep(0.01)
-        async with factory() as session:
-            refreshed = await session.get(Job, job.id)
-            if refreshed is not None and refreshed.status == "done":
-                break
+        if sqs.deleted:
+            break
     stop.set()
     await asyncio.wait_for(task, timeout=2)
     async with factory() as session:
-        refreshed = await session.get(Job, job.id)
-        assert refreshed is not None
-        assert refreshed.status == "done"
+        assert (await session.get(Document, doc.id)).status == "processed"  # type: ignore[union-attr]
+
+
+async def test_worker_loop_survives_non_sqs_errors(
+    factory: async_sessionmaker[AsyncSession], sqs: FakeSqs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("processing.worker.LOOP_ERROR_BACKOFF_SECONDS", 0)
+    doc = await seed(factory)
+    sqs.put(message_for(doc.id))
+    sqs.fail_next_receive = RuntimeError("database is down")
+    stop = asyncio.Event()
+    task = asyncio.create_task(
+        worker_loop(factory, queue_for(sqs), CHUNKER, EMBEDDER, stop_event=stop)
+    )
+    for _ in range(100):
+        await asyncio.sleep(0.01)
+        if sqs.deleted:
+            break
+    stop.set()
+    await asyncio.wait_for(task, timeout=2)
+    async with factory() as session:
+        assert (await session.get(Document, doc.id)).status == "processed"  # type: ignore[union-attr]
+
+
+async def test_last_attempt_failure_does_not_overwrite_processed(
+    factory: async_sessionmaker[AsyncSession], sqs: FakeSqs
+) -> None:
+    # A duplicate delivery fails on its last attempt after another copy succeeded.
+    doc = await seed(factory)
+    async with factory() as session:
+        stored = await session.get(Document, doc.id)
+        assert stored is not None
+        stored.status = "processed"
+        await session.commit()
+    sqs.put(message_for(doc.id))
+    queue = queue_for(sqs, max_receive_count=1)
+    assert await run_once(factory, queue, CHUNKER, FailingEmbedder()) is True
+    async with factory() as session:
+        assert (await session.get(Document, doc.id)).status == "processed"  # type: ignore[union-attr]

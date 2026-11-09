@@ -37,14 +37,17 @@ sequenceDiagram
     participant C as Client
     participant I as ingestion
     participant DB as Postgres
+    participant Q as SQS
     participant P as processing
     participant R as retrieval
     participant G as generation
     participant L as Bedrock
 
     C->>I: POST /documents (file)
-    I->>DB: insert document (dedup by content hash) + job
-    P->>DB: poll job → normalize → chunk
+    I->>DB: insert document (dedup by content hash)
+    I->>Q: send process_document
+    P->>Q: long-poll message
+    P->>DB: load document → normalize → chunk
     P->>L: embed chunks
     P->>DB: store chunks + vectors (pgvector)
     C->>G: POST /query {question}
@@ -61,14 +64,17 @@ sequenceDiagram
 One shared Postgres instance in the MVP (ADR-0004). ORM models live in
 `libs/db` (`rag_db`); the ingestion service owns the single alembic
 migration lineage. Tables so far: `documents` (dedup by sha256 content
-hash, per-filename versioning), `jobs` (outbox for async processing).
+hash, per-filename versioning), `chunks` (text, metadata, embeddings).
 
 ## Async processing
 
-The `jobs` table is the queue (ADR-0005): ingestion enqueues transactionally
-(outbox), the processing service claims with `FOR UPDATE SKIP LOCKED`,
-retries up to `max_attempts`, then dead-letters (`dead`) and marks the
-document `failed`. Pipeline: normalize (NFKC/whitespace) → metadata (title,
+An SQS queue connects ingestion and processing (ADR-0009, replacing the
+Postgres `jobs` table of ADR-0005). Ingestion commits the document, then
+sends a `process_document` message; if the send fails the document is
+deleted and the upload returns 503. Processing long-polls, deletes the
+message only on success, and relies on the redrive policy
+(`maxReceiveCount = 3`) to dead-letter; the final failed attempt marks the
+document `failed`. Locally, ElasticMQ stands in for SQS. Pipeline: normalize (NFKC/whitespace) → metadata (title,
 language heuristic, char/token counts) → chunk (Phase 3) → embed (Phase 5).
 
 ## Chunking

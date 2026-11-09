@@ -15,6 +15,9 @@ locals {
 
   cloudmap_namespace = "${var.environment}.${var.project_name}.local"
 
+  processing_max_receive_count          = 3
+  processing_visibility_timeout_seconds = 300
+
   services = {
     ingestion = {
       port             = 8001
@@ -25,8 +28,9 @@ locals {
       env = merge(
         local.base_environment,
         {
-          RAG_SERVICE_NAME = "ingestion"
-          RAG_PORT         = "8001"
+          RAG_SERVICE_NAME         = "ingestion"
+          RAG_PORT                 = "8001"
+          RAG_PROCESSING_QUEUE_URL = aws_sqs_queue.processing.url
         },
         lookup(var.service_environment, "ingestion", {})
       )
@@ -44,7 +48,8 @@ locals {
           RAG_PORT                   = "8002"
           RAG_EMBEDDING_PROVIDER     = "bedrock"
           RAG_WORKER_ENABLED         = "true"
-          RAG_POLL_INTERVAL_SECONDS  = "1.0"
+          RAG_PROCESSING_QUEUE_URL   = aws_sqs_queue.processing.url
+          RAG_MAX_RECEIVE_COUNT      = tostring(local.processing_max_receive_count)
           RAG_CHUNK_STRATEGY         = "recursive"
           RAG_CHUNK_SIZE             = "1200"
           RAG_CHUNK_OVERLAP          = "200"

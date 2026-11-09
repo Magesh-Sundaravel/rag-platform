@@ -54,3 +54,10 @@ class UpstreamError(RagPlatformError):
 
     code = "upstream_error"
     status_code = 502
+
+
+class ServiceUnavailableError(RagPlatformError):
+    """A dependency is temporarily unavailable; the client should retry."""
+
+    code = "service_unavailable"
+    status_code = 503

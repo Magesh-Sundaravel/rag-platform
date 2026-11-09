@@ -43,13 +43,17 @@ convention = "google"
 strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
-mypy_path = "libs/common/src:libs/contracts/src:libs/db/src:libs/providers/src:libs/evaluation/src:libs/guardrails/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src:services/ingestion/tests"
+mypy_path = "libs/common/src:libs/contracts/src:libs/db/src:libs/providers/src:libs/evaluation/src:libs/guardrails/src:services/ingestion/src:services/processing/src:services/retrieval/src:services/generation/src:services/ingestion/tests:services/processing/tests"
 explicit_package_bases = true
 exclude = "(build|dist|\\.venv)"
 
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["boto3", "botocore.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

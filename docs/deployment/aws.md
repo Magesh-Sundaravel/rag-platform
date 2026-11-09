@@ -9,6 +9,8 @@ on Fargate, Amazon RDS for PostgreSQL, ECR, CloudWatch Logs, and a public ALB.
 - `processing` and `retrieval` are private ECS services discovered through
   Cloud Map DNS inside the VPC.
 - One RDS PostgreSQL instance backs all services.
+- One SQS queue (plus DLQ) carries ingestion → processing hand-off
+  (ADR-0009).
 - One ECR repository exists per service image.
 - Logs go to CloudWatch; traces remain optional through
   `RAG_OTEL_EXPORTER_ENDPOINT`.
@@ -42,6 +44,7 @@ Shared values:
 - `RAG_SERVICE_NAME=ingestion`
 - `RAG_PORT=8001`
 - `RAG_DATABASE_URL` from the Terraform-managed Secrets Manager secret
+- `RAG_PROCESSING_QUEUE_URL` from the Terraform-managed SQS queue
 
 `processing`
 
@@ -50,7 +53,8 @@ Shared values:
 - `RAG_DATABASE_URL` from the Terraform-managed Secrets Manager secret
 - `RAG_EMBEDDING_PROVIDER=bedrock`
 - `RAG_WORKER_ENABLED=true`
-- `RAG_POLL_INTERVAL_SECONDS=1.0`
+- `RAG_PROCESSING_QUEUE_URL` from the Terraform-managed SQS queue
+- `RAG_MAX_RECEIVE_COUNT=3` (must match the queue's redrive `maxReceiveCount`)
 - `RAG_CHUNK_STRATEGY=recursive`
 - `RAG_CHUNK_SIZE=1200`
 - `RAG_CHUNK_OVERLAP=200`
@@ -125,6 +129,33 @@ for service in ingestion processing retrieval generation; do
     "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/rag-platform-prod-${service}:${TAG}"
 done
 ```
+
+## Cutover from the Postgres job queue (ADR-0009)
+
+Migration `0007` drops the `jobs` table without moving its rows to SQS. On an
+environment that already runs the old images, drain the old queue first:
+
+1. Stop new uploads: scale the `ingestion` service to 0 tasks.
+2. Let the old `processing` tasks finish the backlog. Wait until this
+   returns 0:
+
+```sql
+SELECT count(*) FROM jobs WHERE status IN ('pending', 'in_progress');
+```
+
+   Rows stuck in `in_progress` (from a crashed worker) never drain; note
+   their documents and continue.
+3. Run the migrations (next section), deploy the new images, and scale
+   `ingestion` back up.
+4. Any document still `pending` after cutover has no SQS message. Re-upload
+   the same file: ingestion re-sends the message for a pending duplicate
+   instead of returning 409. To list them:
+
+```sql
+SELECT id, filename FROM documents WHERE status = 'pending';
+```
+
+Fresh environments can skip this section.
 
 ## Database migrations and pgvector enablement
 

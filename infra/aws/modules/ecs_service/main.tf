@@ -76,13 +76,13 @@ resource "aws_ecs_task_definition" "this" {
 }
 
 resource "aws_ecs_service" "this" {
-  name                               = "${var.name_prefix}-${var.service_name}"
-  cluster                            = var.cluster_arn
-  task_definition                    = aws_ecs_task_definition.this.arn
-  desired_count                      = var.desired_count
-  launch_type                        = "FARGATE"
-  health_check_grace_period_seconds  = var.target_group_arn == null ? null : 60
-  enable_execute_command             = true
+  name                              = "${var.name_prefix}-${var.service_name}"
+  cluster                           = var.cluster_arn
+  task_definition                   = aws_ecs_task_definition.this.arn
+  desired_count                     = var.desired_count
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = var.target_group_arn == null ? null : 60
+  enable_execute_command            = true
 
   network_configuration {
     subnets          = var.subnet_ids

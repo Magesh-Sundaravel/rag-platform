@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from rag_providers.bedrock import BedrockEmbeddingProvider
 from rag_providers.embedding import FakeEmbeddingProvider
 from rag_providers.factory import build_embedding_provider
-from rag_providers.bedrock import BedrockEmbeddingProvider
 
 
 async def test_fake_is_deterministic() -> None:

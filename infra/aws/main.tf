@@ -131,14 +131,14 @@ module "alb" {
 module "rds" {
   source = "./modules/rds"
 
-  name_prefix         = local.name_prefix
-  subnet_ids          = module.network.private_subnet_ids
-  security_group_ids  = [aws_security_group.rds.id]
-  db_name             = var.db_name
-  db_username         = var.db_username
-  db_password         = var.db_password
-  instance_class      = var.db_instance_class
-  allocated_storage   = var.db_allocated_storage
+  name_prefix        = local.name_prefix
+  subnet_ids         = module.network.private_subnet_ids
+  security_group_ids = [aws_security_group.rds.id]
+  db_name            = var.db_name
+  db_username        = var.db_username
+  db_password        = var.db_password
+  instance_class     = var.db_instance_class
+  allocated_storage  = var.db_allocated_storage
 }
 
 resource "aws_secretsmanager_secret" "database_url" {
@@ -269,29 +269,29 @@ module "ecs_service" {
   source   = "./modules/ecs_service"
   for_each = local.services
 
-  name_prefix                = local.name_prefix
-  service_name               = each.key
-  cluster_arn                = aws_ecs_cluster.main.arn
-  subnet_ids                 = module.network.private_subnet_ids
-  security_group_ids         = [aws_security_group.ecs.id]
-  cloudmap_namespace_id      = aws_service_discovery_private_dns_namespace.services.id
-  execution_role_arn         = aws_iam_role.ecs_execution.arn
-  task_role_arn              = aws_iam_role.ecs_task.arn
-  desired_count              = lookup(var.service_desired_count, each.key, 1)
-  cpu                        = lookup(var.service_cpu, each.key, 512)
-  memory                     = lookup(var.service_memory, each.key, 1024)
-  container_port             = each.value.port
-  image_uri                  = "${module.ecr.repository_urls[each.key]}:${lookup(var.service_image_tags, each.key, var.service_image_tag)}"
-  environment                = merge(
+  name_prefix           = local.name_prefix
+  service_name          = each.key
+  cluster_arn           = aws_ecs_cluster.main.arn
+  subnet_ids            = module.network.private_subnet_ids
+  security_group_ids    = [aws_security_group.ecs.id]
+  cloudmap_namespace_id = aws_service_discovery_private_dns_namespace.services.id
+  execution_role_arn    = aws_iam_role.ecs_execution.arn
+  task_role_arn         = aws_iam_role.ecs_task.arn
+  desired_count         = lookup(var.service_desired_count, each.key, 1)
+  cpu                   = lookup(var.service_cpu, each.key, 512)
+  memory                = lookup(var.service_memory, each.key, 1024)
+  container_port        = each.value.port
+  image_uri             = "${module.ecr.repository_urls[each.key]}:${lookup(var.service_image_tags, each.key, var.service_image_tag)}"
+  environment = merge(
     each.value.env,
     var.otel_exporter_endpoint == null ? {} : { RAG_OTEL_EXPORTER_ENDPOINT = var.otel_exporter_endpoint }
   )
-  secrets                    = merge(
+  secrets = merge(
     { RAG_DATABASE_URL = aws_secretsmanager_secret.database_url.arn },
     lookup(var.service_secrets, each.key, {})
   )
-  assign_public_ip           = false
-  enable_service_discovery   = true
-  target_group_arn           = try(module.alb.target_group_arns[each.key], null)
-  aws_region                 = var.aws_region
+  assign_public_ip         = false
+  enable_service_discovery = true
+  target_group_arn         = try(module.alb.target_group_arns[each.key], null)
+  aws_region               = var.aws_region
 }

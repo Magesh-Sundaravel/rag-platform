@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from rag_contracts.filters import FilterOp, MetadataFilter
@@ -54,6 +55,9 @@ async def seed_chunks(factory: async_sessionmaker[AsyncSession]) -> dict[str, Ch
         "irrelevant": "Quarterly revenue grew twelve percent year over year.",
     }
     async with factory() as session:
+        # The DB is shared by every test in this module; clear earlier seeds so
+        # identical chunks don't tie with (and outrank) this test's chunks.
+        await session.execute(delete(Document))  # chunks cascade via FK
         doc = Document(
             filename="animals.txt",
             content_type="text/plain",
@@ -110,9 +114,10 @@ async def test_hybrid_search_fuses_both_signals(
         items = await hybrid_search(
             session, EMBEDDER, SearchRequest(query="quokka Rottnest island", top_k=5)
         )
-    ids = {item.chunk_id for item in items}
-    assert chunks["keyword"].id in ids
-    assert chunks["irrelevant"].id not in ids
+    # Only the keyword chunk matches FTS (plainto_tsquery ANDs terms), so it is
+    # the one chunk in both ranked lists and must win the RRF fusion. Vector
+    # KNN has no distance cutoff, so with three chunks all of them are returned.
+    assert items[0].chunk_id == chunks["keyword"].id
 
 
 async def test_hybrid_search_applies_metadata_filters(

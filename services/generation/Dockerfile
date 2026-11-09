@@ -12,6 +12,11 @@ FROM python:3.12-slim
 RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
+COPY libs/common/src ./libs/common/src
+COPY libs/contracts/src ./libs/contracts/src
+COPY libs/guardrails/src ./libs/guardrails/src
+COPY libs/providers/src ./libs/providers/src
+COPY services/generation/src ./services/generation/src
 ENV PATH="/app/.venv/bin:$PATH"
 USER app
 EXPOSE 8004

@@ -1,7 +1,5 @@
 """Hybrid search orchestration: vector KNN + full-text, fused with RRF."""
 
-import asyncio
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from rag_contracts.search import SearchRequest, SearchResultItem
@@ -34,10 +32,10 @@ async def hybrid_search(
     candidate_k = request.top_k * CANDIDATE_MULTIPLIER
     [query_vector] = await embedder.embed([request.query])
 
-    vector_chunks, text_chunks = await asyncio.gather(
-        vector_knn(session, query_vector, candidate_k, predicates),
-        fulltext_search(session, request.query, candidate_k, predicates),
-    )
+    # Async SQLAlchemy sessions do not permit concurrent DB operations on the
+    # same session, so run the two searches back-to-back.
+    vector_chunks = await vector_knn(session, query_vector, candidate_k, predicates)
+    text_chunks = await fulltext_search(session, request.query, candidate_k, predicates)
     by_id: dict[object, Chunk] = {c.id: c for c in [*vector_chunks, *text_chunks]}
 
     scores = reciprocal_rank_fusion([[c.id for c in vector_chunks], [c.id for c in text_chunks]])

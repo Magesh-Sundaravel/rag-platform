@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -1373,6 +1373,7 @@ version = "0.1.0"
 source = { editable = "services/ingestion" }
 dependencies = [
     { name = "alembic" },
+    { name = "boto3" },
     { name = "pypdf" },
     { name = "python-multipart" },
     { name = "rag-common" },
@@ -1384,6 +1385,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.14" },
+    { name = "boto3", specifier = ">=1.43" },
     { name = "pypdf", specifier = ">=5.1" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "rag-common", editable = "libs/common" },
@@ -1428,6 +1430,7 @@ name = "rag-processing"
 version = "0.1.0"
 source = { editable = "services/processing" }
 dependencies = [
+    { name = "boto3" },
     { name = "rag-common" },
     { name = "rag-contracts" },
     { name = "rag-db" },
@@ -1437,6 +1440,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "boto3", specifier = ">=1.43" },
     { name = "rag-common", editable = "libs/common" },
     { name = "rag-contracts", editable = "libs/contracts" },
     { name = "rag-db", editable = "libs/db" },

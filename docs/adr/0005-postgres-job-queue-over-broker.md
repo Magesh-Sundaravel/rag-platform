@@ -1,6 +1,6 @@
 # ADR-0005: Postgres job queue instead of a message broker
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0009
 - **Date:** 2026-07-12
 
 ## Context

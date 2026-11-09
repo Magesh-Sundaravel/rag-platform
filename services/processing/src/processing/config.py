@@ -11,7 +11,10 @@ class Settings(BaseServiceSettings):
     service_name: str = "processing"
     port: int = 8002
     database_url: str = "postgresql+asyncpg://rag:rag_dev_password@localhost:5432/rag"
-    poll_interval_seconds: float = 1.0
+    processing_queue_url: str = "http://localhost:9324/000000000000/rag-processing"
+    sqs_endpoint_url: str | None = None
+    queue_wait_seconds: int = 20
+    max_receive_count: int = 3
     worker_enabled: bool = True
     chunk_strategy: Literal["fixed", "recursive"] = "recursive"
     chunk_size: int = 1200

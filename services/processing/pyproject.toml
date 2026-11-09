@@ -9,6 +9,7 @@ dependencies = [
     "uvicorn[standard]>=0.34",
     "rag-db",
     "rag-providers",
+    "boto3>=1.43",
 ]
 
 [tool.uv.sources]

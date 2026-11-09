@@ -1,5 +1,7 @@
 """Helpers for ingestion tests (unique module name repo-wide)."""
 
+from typing import Any
+
 
 def make_pdf(text: str) -> bytes:
     """Build a minimal one-page PDF containing the given text."""
@@ -33,3 +35,17 @@ def upload_payload(
 ) -> dict[str, tuple[str, bytes, str]]:
     """Build the httpx multipart ``files`` mapping for an upload."""
     return {"file": (name, content, mime)}
+
+
+class FakeSqsClient:
+    """Records sent messages; set ``error`` to make ``send_message`` raise it."""
+
+    def __init__(self) -> None:
+        self.sent: list[dict[str, Any]] = []
+        self.error: Exception | None = None
+
+    def send_message(self, **kwargs: Any) -> dict[str, Any]:
+        if self.error is not None:
+            raise self.error
+        self.sent.append(kwargs)
+        return {"MessageId": str(len(self.sent))}

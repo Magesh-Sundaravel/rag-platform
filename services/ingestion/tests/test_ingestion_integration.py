@@ -7,11 +7,12 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from ingestion_test_helpers import upload_payload
+from ingestion_test_helpers import FakeSqsClient, upload_payload
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from ingestion.app import app
 from ingestion.db import get_session
+from ingestion.queue import ProcessingQueue, get_queue
 
 DB_URL = os.environ.get("RAG_TEST_DB_URL", "")
 pytestmark = pytest.mark.skipif(not DB_URL, reason="RAG_TEST_DB_URL not set")
@@ -45,6 +46,7 @@ async def pg_client(migrated_db: str) -> AsyncIterator[AsyncClient]:
             yield session
 
     app.dependency_overrides[get_session] = override
+    app.dependency_overrides[get_queue] = lambda: ProcessingQueue("test-queue", FakeSqsClient())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
@@ -55,8 +57,10 @@ async def test_full_document_lifecycle_on_postgres(pg_client: AsyncClient) -> No
     r1 = await pg_client.post("/documents", files=upload_payload("pg.txt", b"postgres v1"))
     assert r1.status_code == 201
 
+    # Still pending, so a re-upload re-sends the message for the same document.
     dup = await pg_client.post("/documents", files=upload_payload("pg.txt", b"postgres v1"))
-    assert dup.status_code == 409
+    assert dup.status_code == 201
+    assert dup.json()["id"] == r1.json()["id"]
 
     r2 = await pg_client.post("/documents", files=upload_payload("pg.txt", b"postgres v2"))
     assert r2.status_code == 201

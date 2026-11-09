@@ -30,3 +30,13 @@ output "service_names" {
     name => module_ref.service_name
   }
 }
+
+output "processing_queue_url" {
+  description = "SQS queue URL for ingestion → processing hand-off."
+  value       = aws_sqs_queue.processing.url
+}
+
+output "processing_dlq_url" {
+  description = "Dead-letter queue URL for documents that failed processing."
+  value       = aws_sqs_queue.processing_dlq.url
+}

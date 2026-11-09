@@ -150,6 +150,24 @@ resource "aws_secretsmanager_secret_version" "database_url" {
   secret_string = local.database_url
 }
 
+# Processing hand-off queue (ADR-0009). maxReceiveCount must match the
+# processing service's RAG_MAX_RECEIVE_COUNT.
+resource "aws_sqs_queue" "processing_dlq" {
+  name                      = "${local.name_prefix}-processing-dlq"
+  message_retention_seconds = 1209600
+}
+
+resource "aws_sqs_queue" "processing" {
+  name                       = "${local.name_prefix}-processing"
+  visibility_timeout_seconds = local.processing_visibility_timeout_seconds
+  receive_wait_time_seconds  = 20
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.processing_dlq.arn
+    maxReceiveCount     = local.processing_max_receive_count
+  })
+}
+
 resource "aws_ecs_cluster" "main" {
   name = "${local.name_prefix}-cluster"
 }
@@ -223,6 +241,16 @@ resource "aws_iam_role_policy" "ecs_task_runtime" {
           "bedrock:ConverseStream"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.processing.arn
       },
       {
         Effect = "Allow"

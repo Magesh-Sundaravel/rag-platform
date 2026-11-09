@@ -9,8 +9,10 @@ microservices monorepo, designed to scale from MVP to 10M+ documents.
 flowchart LR
     Client -->|upload| ING[ingestion :8001]
     Client -->|query| GEN[generation :8004]
-    ING -->|documents + jobs| PG[(PostgreSQL + pgvector)]
-    PROC[processing :8002] -->|poll jobs, write chunks + embeddings| PG
+    ING -->|documents| PG[(PostgreSQL + pgvector)]
+    ING -->|process_document| SQS[[Amazon SQS + DLQ]]
+    SQS -->|long-poll| PROC[processing :8002]
+    PROC -->|write chunks + embeddings| PG
     RET[retrieval :8003] -->|vector + FTS hybrid search| PG
     GEN -->|HTTP /search| RET
     GEN -->|LLM| BEDROCK[Amazon Bedrock]

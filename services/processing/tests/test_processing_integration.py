@@ -1,4 +1,4 @@
-"""Postgres integration tests for job claiming (skipped unless RAG_TEST_DB_URL)."""
+"""Postgres integration test for the SQS consumer (skipped unless RAG_TEST_DB_URL)."""
 
 import os
 import subprocess
@@ -7,12 +7,13 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
+from processing_test_helpers import FakeSqs
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from processing.chunking import RecursiveCharacterChunker
-from processing.worker import claim_job, run_once
-from rag_db.models import Chunk, Document, Job
+from processing.worker import QueueConfig, run_once
+from rag_db.models import Chunk, Document
 from rag_providers.embedding import FakeEmbeddingProvider
 
 CHUNKER = RecursiveCharacterChunker(200, 20)
@@ -42,10 +43,10 @@ async def pg_factory(migrated_db: str) -> AsyncIterator[async_sessionmaker[Async
     await engine.dispose()
 
 
-async def seed_job(factory: async_sessionmaker[AsyncSession]) -> uuid.UUID:
+async def seed_document(factory: async_sessionmaker[AsyncSession]) -> uuid.UUID:
     async with factory() as session:
         doc = Document(
-            filename=f"claim-{uuid.uuid4().hex[:8]}.txt",
+            filename=f"sqs-{uuid.uuid4().hex[:8]}.txt",
             content_type="text/plain",
             content_hash=uuid.uuid4().hex + uuid.uuid4().hex,
             version=1,
@@ -53,49 +54,20 @@ async def seed_job(factory: async_sessionmaker[AsyncSession]) -> uuid.UUID:
             raw_text="The text of the document is right here and it is fine.",
         )
         session.add(doc)
-        await session.flush()
-        job = Job(document_id=doc.id, job_type="process_document", status="pending")
-        session.add(job)
         await session.commit()
-        return job.id
-
-
-async def test_skip_locked_prevents_double_claim(
-    pg_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    first = await seed_job(pg_factory)
-    second = await seed_job(pg_factory)
-
-    async with pg_factory() as s1, pg_factory() as s2:
-        # Hold a row lock on the oldest pending job without committing.
-        locked = await s1.scalar(
-            select(Job)
-            .where(Job.status == "pending")
-            .order_by(Job.created_at)
-            .limit(1)
-            .with_for_update(skip_locked=True)
-        )
-        assert locked is not None
-        # A concurrent claim must skip the locked row and take the other job.
-        claimed = await claim_job(s2)
-        assert claimed is not None
-        assert claimed.id != locked.id
-        assert {locked.id, claimed.id} <= {first, second}
-        await s1.rollback()
+        return doc.id
 
 
 async def test_run_once_processes_on_postgres(
     pg_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    while await run_once(pg_factory, CHUNKER, EMBEDDER):
-        pass
-    job_id = await seed_job(pg_factory)
-    assert await run_once(pg_factory, CHUNKER, EMBEDDER) is True
+    doc_id = await seed_document(pg_factory)
+    sqs = FakeSqs()
+    sqs.put(f'{{"document_id": "{doc_id}"}}')
+    queue = QueueConfig(client=sqs, url="q", wait_seconds=0, max_receive_count=3)
+    assert await run_once(pg_factory, queue, CHUNKER, EMBEDDER) is True
     async with pg_factory() as session:
-        job = await session.get(Job, job_id)
-        assert job is not None
-        assert job.status == "done"
-        doc = await session.get(Document, job.document_id)
+        doc = await session.get(Document, doc_id)
         assert doc is not None
         assert doc.status == "processed"
         chunks = (await session.scalars(select(Chunk).where(Chunk.document_id == doc.id))).all()

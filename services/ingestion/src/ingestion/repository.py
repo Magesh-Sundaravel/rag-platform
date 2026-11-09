@@ -1,15 +1,13 @@
-"""Persistence operations for documents (dedup, versioning, job outbox)."""
+"""Persistence operations for documents (dedup, versioning)."""
 
 import hashlib
 import uuid
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from rag_common.exceptions import ConflictError, NotFoundError
-from rag_db.models import Document, Job
-
-PROCESS_JOB_TYPE = "process_document"
+from rag_db.models import Document
 
 
 def sha256_hex(data: bytes) -> str:
@@ -24,6 +22,27 @@ def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+async def find_pending_duplicate(session: AsyncSession, raw_bytes: bytes) -> Document | None:
+    """Return the still-``pending`` document with identical content, if any.
+
+    A pending duplicate may have lost its processing message (e.g. a crash
+    between commit and SQS send), so a re-upload re-sends it (ADR-0009).
+
+    Args:
+        session: Active async session.
+        raw_bytes: Original file bytes (hashed for lookup).
+
+    Returns:
+        The pending document, or None.
+    """
+    document: Document | None = await session.scalar(
+        select(Document).where(
+            Document.content_hash == sha256_hex(raw_bytes), Document.status == "pending"
+        )
+    )
+    return document
+
+
 async def create_document(
     session: AsyncSession,
     *,
@@ -32,11 +51,10 @@ async def create_document(
     raw_bytes: bytes,
     raw_text: str,
 ) -> Document:
-    """Insert a document with dedup + versioning and a pending job row.
+    """Insert a document with dedup + versioning.
 
     Exact duplicates (same content hash) are rejected. A re-upload of the
     same filename with different content gets ``version = max(version) + 1``.
-    A ``pending`` processing job is written in the same transaction (outbox).
 
     Args:
         session: Active async session (caller controls transaction scope).
@@ -68,8 +86,6 @@ async def create_document(
         raw_text=raw_text,
     )
     session.add(document)
-    await session.flush()
-    session.add(Job(document_id=document.id, job_type=PROCESS_JOB_TYPE, status="pending"))
     await session.commit()
     return document
 
@@ -114,7 +130,7 @@ async def list_documents(
 
 
 async def delete_document(session: AsyncSession, document_id: uuid.UUID) -> None:
-    """Delete a document (jobs cascade via FK).
+    """Delete a document (chunks cascade via FK).
 
     Args:
         session: Active async session.
@@ -124,6 +140,5 @@ async def delete_document(session: AsyncSession, document_id: uuid.UUID) -> None
         NotFoundError: If no such document exists.
     """
     document = await get_document(session, document_id)
-    await session.execute(delete(Job).where(Job.document_id == document.id))
     await session.delete(document)
     await session.commit()

@@ -1,13 +1,16 @@
 """API tests for the ingestion document endpoints (SQLite-backed)."""
 
+import json
 import uuid
 
+import pytest
+from botocore.exceptions import EndpointConnectionError
 from httpx import AsyncClient
-from ingestion_test_helpers import make_pdf, upload_payload
-from sqlalchemy import select
+from ingestion_test_helpers import FakeSqsClient, make_pdf, upload_payload
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from rag_db.models import Job
+from rag_db.models import Document
 
 
 async def test_upload_txt_returns_201(client: AsyncClient) -> None:
@@ -20,11 +23,40 @@ async def test_upload_txt_returns_201(client: AsyncClient) -> None:
     assert len(body["content_hash"]) == 64
 
 
-async def test_exact_duplicate_conflicts(client: AsyncClient) -> None:
+async def test_exact_duplicate_of_processed_document_conflicts(
+    client: AsyncClient, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
     await client.post("/documents", files=upload_payload("a.txt", b"same"))
+    async with session_factory() as session:
+        await session.execute(update(Document).values(status="processed"))
+        await session.commit()
     resp = await client.post("/documents", files=upload_payload("other-name.txt", b"same"))
     assert resp.status_code == 409
     assert resp.json()["error"]["code"] == "conflict"
+
+
+async def test_reupload_of_pending_document_resends_message(
+    client: AsyncClient, sqs: FakeSqsClient
+) -> None:
+    first = await client.post("/documents", files=upload_payload("a.txt", b"stuck"))
+    again = await client.post("/documents", files=upload_payload("a.txt", b"stuck"))
+    assert again.status_code == 201
+    assert again.json()["id"] == first.json()["id"]
+    assert [json.loads(m["MessageBody"])["document_id"] for m in sqs.sent] == [
+        first.json()["id"]
+    ] * 2
+
+
+async def test_failed_resend_keeps_existing_pending_document(
+    client: AsyncClient, sqs: FakeSqsClient, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    first = await client.post("/documents", files=upload_payload("a.txt", b"keep me"))
+    sqs.error = EndpointConnectionError(endpoint_url="http://sqs")
+    resp = await client.post("/documents", files=upload_payload("a.txt", b"keep me"))
+    assert resp.status_code == 503
+    async with session_factory() as session:
+        docs = (await session.scalars(select(Document))).all()
+    assert [str(d.id) for d in docs] == [first.json()["id"]]
 
 
 async def test_changed_content_same_filename_increments_version(client: AsyncClient) -> None:
@@ -34,16 +66,42 @@ async def test_changed_content_same_filename_increments_version(client: AsyncCli
     assert r2.json()["version"] == 2
 
 
-async def test_upload_writes_pending_job(
-    client: AsyncClient, session_factory: async_sessionmaker[AsyncSession]
+async def test_upload_sends_processing_message(client: AsyncClient, sqs: FakeSqsClient) -> None:
+    resp = await client.post("/documents", files=upload_payload("a.txt", b"queue me"))
+    assert resp.status_code == 201
+    assert len(sqs.sent) == 1
+    assert sqs.sent[0]["QueueUrl"] == "test-queue"
+    assert json.loads(sqs.sent[0]["MessageBody"]) == {"document_id": resp.json()["id"]}
+
+
+async def test_enqueue_failure_rolls_back_upload_with_503(
+    client: AsyncClient, sqs: FakeSqsClient, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    resp = await client.post("/documents", files=upload_payload("a.txt", b"job me"))
-    doc_id = uuid.UUID(resp.json()["id"])
+    sqs.error = EndpointConnectionError(endpoint_url="http://sqs")
+    resp = await client.post("/documents", files=upload_payload("a.txt", b"lost"))
+    assert resp.status_code == 503
+    assert resp.json()["error"]["code"] == "service_unavailable"
     async with session_factory() as session:
-        job = (await session.scalars(select(Job).where(Job.document_id == doc_id))).one()
-    assert job.status == "pending"
-    assert job.job_type == "process_document"
-    assert job.attempts == 0
+        assert (await session.scalars(select(Document))).all() == []
+
+    # The client's retry succeeds once SQS is back (no duplicate-content 409).
+    sqs.error = None
+    retry = await client.post("/documents", files=upload_payload("a.txt", b"lost"))
+    assert retry.status_code == 201
+
+
+async def test_non_boto_enqueue_error_still_rolls_back_upload(
+    client: AsyncClient, sqs: FakeSqsClient, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    sqs.error = RuntimeError("cannot schedule new futures after shutdown")
+    with pytest.raises(RuntimeError):
+        await client.post("/documents", files=upload_payload("a.txt", b"orphan?"))
+    async with session_factory() as session:
+        assert (await session.scalars(select(Document))).all() == []
+
+    sqs.error = None
+    retry = await client.post("/documents", files=upload_payload("a.txt", b"orphan?"))
+    assert retry.status_code == 201
 
 
 async def test_get_document(client: AsyncClient) -> None:

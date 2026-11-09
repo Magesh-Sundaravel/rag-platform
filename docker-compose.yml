@@ -15,17 +15,31 @@ services:
       timeout: 3s
       retries: 10
 
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.7.1
+    ports:
+      - "9324:9324"
+    volumes:
+      - ./infra/local/elasticmq.conf:/opt/elasticmq.conf:ro
+
   ingestion:
     build:
       context: .
       dockerfile: services/ingestion/Dockerfile
     environment:
       RAG_ENVIRONMENT: dev
+      RAG_SQS_ENDPOINT_URL: http://elasticmq:9324
+      RAG_PROCESSING_QUEUE_URL: http://elasticmq:9324/000000000000/rag-processing
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
     ports:
       - "8001:8001"
     depends_on:
       postgres:
         condition: service_healthy
+      elasticmq:
+        condition: service_started
 
   processing:
     build:
@@ -33,11 +47,18 @@ services:
       dockerfile: services/processing/Dockerfile
     environment:
       RAG_ENVIRONMENT: dev
+      RAG_SQS_ENDPOINT_URL: http://elasticmq:9324
+      RAG_PROCESSING_QUEUE_URL: http://elasticmq:9324/000000000000/rag-processing
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
     ports:
       - "8002:8002"
     depends_on:
       postgres:
         condition: service_healthy
+      elasticmq:
+        condition: service_started
 
   retrieval:
     build:

@@ -2,14 +2,14 @@
 
 from sqlalchemy import inspect
 
-from rag_db.models import Base, Document, Job
+from rag_db.models import Base, Chunk, Document
 from rag_db.session import create_engine, create_session_factory
 
 
 def test_models_registered() -> None:
     tables = Base.metadata.tables
     assert "documents" in tables
-    assert "jobs" in tables
+    assert "jobs" not in tables
 
 
 def test_document_defaults() -> None:
@@ -24,8 +24,8 @@ def test_document_defaults() -> None:
     assert doc.filename == "a.txt"
 
 
-def test_job_fk_cascade() -> None:
-    fk = next(iter(inspect(Job).columns["document_id"].foreign_keys))
+def test_chunk_fk_cascade() -> None:
+    fk = next(iter(inspect(Chunk).columns["document_id"].foreign_keys))
     assert fk.ondelete == "CASCADE"
 
 

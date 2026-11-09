@@ -1,137 +1,171 @@
-"""Job-queue worker: claim, run, retry, dead-letter (ADR-0005)."""
+"""SQS consumer: receive, process, delete; retries and DLQ via redrive (ADR-0009)."""
 
 import asyncio
+from dataclasses import dataclass
+from typing import Any
 
-from sqlalchemy import select
+from pydantic import ValidationError
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from processing.chunking import Chunker
 from processing.pipeline import process_document
 from rag_common.logging import get_logger
-from rag_db.models import Document, Job
+from rag_contracts.processing import ProcessDocumentMessage
+from rag_db.models import Document
 from rag_providers.embedding import EmbeddingProvider
 
 logger = get_logger("processing.worker")
 
-PROCESS_JOB_TYPE = "process_document"
+LOOP_ERROR_BACKOFF_SECONDS = 1.0
 
 
-async def claim_job(session: AsyncSession) -> Job | None:
-    """Claim one pending job using FOR UPDATE SKIP LOCKED.
+@dataclass(frozen=True)
+class QueueConfig:
+    """Where and how to consume processing messages.
 
-    The claim (status → ``in_progress``) is committed immediately so
-    concurrent workers skip this row.
-
-    Args:
-        session: Active async session.
-
-    Returns:
-        The claimed job, or None when the queue is empty.
+    Attributes:
+        client: boto3 SQS client (or a test double).
+        url: SQS queue URL.
+        wait_seconds: Long-poll duration per receive call.
+        max_receive_count: Must equal the queue's redrive ``maxReceiveCount``;
+            the attempt with this receive count marks the document ``failed``.
     """
-    job = await session.scalar(
-        select(Job)
-        .where(Job.status == "pending")
-        .order_by(Job.created_at)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    )
-    if job is None:
-        return None
-    job.status = "in_progress"
-    await session.commit()
-    return job
+
+    client: Any
+    url: str
+    wait_seconds: int
+    max_receive_count: int
 
 
-async def _mark_failure(session: AsyncSession, job: Job, error: str) -> None:
-    """Record a failed attempt: retry or dead-letter.
-
-    Args:
-        session: Active async session.
-        job: The failed job.
-        error: Error description stored on the job.
-    """
-    job.attempts += 1
-    job.last_error = error[:2000]
-    if job.attempts >= job.max_attempts:
-        job.status = "dead"
-        document = await session.get(Document, job.document_id)
-        if document is not None:
-            document.status = "failed"
-        logger.error("job dead-lettered", job_id=str(job.id), error=error)
-    else:
-        job.status = "pending"
-        logger.warning("job retry scheduled", job_id=str(job.id), attempts=job.attempts)
-    await session.commit()
-
-
-async def run_job(
-    session: AsyncSession, job: Job, chunker: Chunker, embedder: EmbeddingProvider
-) -> None:
-    """Execute one claimed job and persist the outcome.
-
-    Args:
-        session: Active async session.
-        job: A job in ``in_progress`` state.
-        chunker: Chunking strategy passed to the pipeline.
-        embedder: Embedding provider passed to the pipeline.
-    """
-    try:
-        if job.job_type != PROCESS_JOB_TYPE:
-            raise ValueError(f"unknown job type: {job.job_type}")
-        document = await session.get(Document, job.document_id)
-        if document is None:
-            raise ValueError(f"document {job.document_id} not found")
-        await process_document(session, document, chunker, embedder)
-        job.status = "done"
-        await session.commit()
-        logger.info("job done", job_id=str(job.id), document_id=str(job.document_id))
-    except Exception as exc:
-        await session.rollback()
-        job_row = await session.get(Job, job.id)
-        if job_row is not None:
-            await _mark_failure(session, job_row, str(exc))
-
-
-async def run_once(
-    factory: async_sessionmaker[AsyncSession], chunker: Chunker, embedder: EmbeddingProvider
+async def handle_message(
+    factory: async_sessionmaker[AsyncSession],
+    message: dict[str, Any],
+    chunker: Chunker,
+    embedder: EmbeddingProvider,
+    *,
+    max_receive_count: int,
 ) -> bool:
-    """Claim and run at most one job.
+    """Process one SQS message.
 
     Args:
         factory: Session factory.
+        message: Raw SQS message (``Body`` and ``Attributes``).
+        chunker: Chunking strategy passed to the pipeline.
+        embedder: Embedding provider passed to the pipeline.
+        max_receive_count: Receive count at which a failure is final.
+
+    Returns:
+        True if the message should be deleted (done, or nothing to do);
+        False to leave it for SQS to redeliver or dead-letter.
+    """
+    try:
+        body = ProcessDocumentMessage.model_validate_json(message["Body"])
+    except ValidationError as exc:
+        logger.error("invalid message body", message_id=message.get("MessageId"), error=str(exc))
+        return False
+
+    receive_count = int(message.get("Attributes", {}).get("ApproximateReceiveCount", "1"))
+    async with factory() as session:
+        document = await session.get(Document, body.document_id)
+        if document is None:
+            logger.warning(
+                "document not found; dropping message", document_id=str(body.document_id)
+            )
+            return True
+        try:
+            await process_document(session, document, chunker, embedder)
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            if receive_count >= max_receive_count:
+                # Conditional so a concurrent duplicate delivery that already
+                # succeeded is never overwritten with "failed".
+                await session.execute(
+                    update(Document)
+                    .where(Document.id == body.document_id, Document.status != "processed")
+                    .values(status="failed")
+                )
+                await session.commit()
+                logger.error(
+                    "processing failed; dead-lettering",
+                    document_id=str(body.document_id),
+                    attempts=receive_count,
+                    error=str(exc),
+                )
+            else:
+                logger.warning(
+                    "processing failed; will retry",
+                    document_id=str(body.document_id),
+                    attempts=receive_count,
+                    error=str(exc),
+                )
+            return False
+    logger.info("document processed", document_id=str(body.document_id))
+    return True
+
+
+async def run_once(
+    factory: async_sessionmaker[AsyncSession],
+    queue: QueueConfig,
+    chunker: Chunker,
+    embedder: EmbeddingProvider,
+) -> bool:
+    """Receive and handle at most one message.
+
+    Args:
+        factory: Session factory.
+        queue: Queue client and settings.
         chunker: Chunking strategy passed to the pipeline.
         embedder: Embedding provider passed to the pipeline.
 
     Returns:
-        True if a job was processed, False if the queue was empty.
+        True if a message was received, False if the long poll came back empty.
     """
-    async with factory() as session:
-        job = await claim_job(session)
-        if job is None:
-            return False
-        await run_job(session, job, chunker, embedder)
-        return True
+    response = await asyncio.to_thread(
+        queue.client.receive_message,
+        QueueUrl=queue.url,
+        MaxNumberOfMessages=1,
+        WaitTimeSeconds=queue.wait_seconds,
+        AttributeNames=["ApproximateReceiveCount"],
+    )
+    messages = response.get("Messages", [])
+    for message in messages:
+        if await handle_message(
+            factory, message, chunker, embedder, max_receive_count=queue.max_receive_count
+        ):
+            await asyncio.to_thread(
+                queue.client.delete_message,
+                QueueUrl=queue.url,
+                ReceiptHandle=message["ReceiptHandle"],
+            )
+    return bool(messages)
 
 
 async def worker_loop(
     factory: async_sessionmaker[AsyncSession],
+    queue: QueueConfig,
     chunker: Chunker,
     embedder: EmbeddingProvider,
     *,
-    poll_interval: float,
     stop_event: asyncio.Event | None = None,
 ) -> None:
-    """Poll the job queue until cancelled or the stop event is set.
+    """Consume the queue until cancelled or the stop event is set.
 
     Args:
         factory: Session factory.
+        queue: Queue client and settings.
         chunker: Chunking strategy passed to the pipeline.
         embedder: Embedding provider passed to the pipeline.
-        poll_interval: Seconds to sleep when the queue is empty.
         stop_event: Optional cooperative stop signal (used by tests and
             graceful shutdown).
     """
     while stop_event is None or not stop_event.is_set():
-        processed = await run_once(factory, chunker, embedder)
-        if not processed:
-            await asyncio.sleep(poll_interval)
+        try:
+            await run_once(factory, queue, chunker, embedder)
+        except Exception as exc:
+            # Any error (SQS or database) must not kill the consumer: the app
+            # would stay healthy while nothing consumes. Unacked messages are
+            # redelivered by SQS after the visibility timeout.
+            logger.error("worker iteration failed; backing off", error=str(exc))
+            await asyncio.sleep(LOOP_ERROR_BACKOFF_SECONDS)

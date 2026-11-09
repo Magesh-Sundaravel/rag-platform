@@ -114,9 +114,10 @@ async def test_hybrid_search_fuses_both_signals(
         items = await hybrid_search(
             session, EMBEDDER, SearchRequest(query="quokka Rottnest island", top_k=5)
         )
-    ids = {item.chunk_id for item in items}
-    assert chunks["keyword"].id in ids
-    assert chunks["irrelevant"].id not in ids
+    # Only the keyword chunk matches FTS (plainto_tsquery ANDs terms), so it is
+    # the one chunk in both ranked lists and must win the RRF fusion. Vector
+    # KNN has no distance cutoff, so with three chunks all of them are returned.
+    assert items[0].chunk_id == chunks["keyword"].id
 
 
 async def test_hybrid_search_applies_metadata_filters(
